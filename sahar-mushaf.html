@@ -277,6 +277,14 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .toast span{display:block;font-family:system-ui,sans-serif;font-size:.88rem;
   color:var(--ink);margin-top:2px;line-height:1.6}
 
+/* ===== زر المشاركة ===== */
+.sharebtn{width:100%;margin-top:11px;padding:15px;display:flex;align-items:center;
+  justify-content:center;gap:10px;border-radius:var(--r);background:var(--accent);
+  border:1px solid var(--accent);color:var(--bg);font-size:1.15rem;font-weight:700}
+.sharebtn svg{width:22px;height:22px}
+.sharebtn:active{opacity:.85}
+.sheet-actions button b{display:block;font-size:1.05rem;margin-bottom:2px}
+
 </style>
 </head>
 <body>
@@ -399,18 +407,34 @@ const snd = {
   },
   open() { this.tone(587.33, .22, 'sine', .045); this.tone(880, .26, 'sine', .03, .055); },
 
-  /* نغمة وقورة من عبارتين متماثلتين، كل عبارة نغمتان صاعدتان */
-  takbir(force) {
-    const on = force || prefs.snd;
-    if (!on) return;
+  /* نغمة إعلان مطوّلة: ثلاث عبارات، كل عبارة قرار ثم جواب، بطبقات هارمونية
+     ملحوظة: هذه نغمة وليست تكبيراً بصوت بشري — التكبير يحتاج تسجيلاً حقيقياً. */
+  phrase(d, base) {
+    this.tone(base,        2.6, 'sine',     .13, d);          /* القرار */
+    this.tone(base * 2,    2.4, 'triangle', .05, d);          /* الجواب — طبقة */
+    this.tone(base * 3,    2.0, 'sine',     .025, d + .05);   /* الخامسة العلوية */
+    this.tone(base * 1.5,  2.6, 'sine',     .09, d + .55);    /* الصعود */
+    this.tone(base * 3,    2.4, 'triangle', .035, d + .55);
+  },
+  callTone(force) {
+    if (!force && !prefs.snd) return;
     const saved = prefs.snd; prefs.snd = true;
-    const P = (d) => {
-      this.tone(293.66, 1.5, 'sine', .075, d);        /* رِي — القرار */
-      this.tone(440.00, 1.7, 'sine', .055, d + .42);  /* لا — الجواب */
-      this.tone(587.33, 2.0, 'sine', .035, d + .42);  /* طبقة علوية خفيفة */
-    };
-    P(0); P(2.6);
+    this.phrase(0,   196.00);   /* صول — قرار عميق */
+    this.phrase(3.4, 196.00);
+    this.phrase(6.8, 261.63);   /* دو — أعلى قليلاً في الختام */
     prefs.snd = saved;
+  },
+  /* إن وضع صاحب التطبيق ملف takbir.mp3 بجوار الصفحة شُغّل بدلاً من النغمة */
+  athan(force) {
+    if (window.__athanFile) {
+      try {
+        const a = new Audio(window.__athanFile);
+        a.volume = 1;
+        a.play().catch(() => this.callTone(force));
+        return;
+      } catch { /* يسقط للنغمة */ }
+    }
+    this.callTone(force);
   },
   /* تنبيه لطيف قبل دخول الوقت */
   alert(force) {
@@ -430,6 +454,16 @@ const snd = {
 };
 addEventListener('pointerdown', () => snd.ready(), { once: true });
 
+/* البحث عن تسجيل أذان اختياري بجوار الصفحة (takbir.mp3) */
+window.__athanFile = null;
+if (window.fetch && location.protocol.startsWith('http')) {
+  try {
+    fetch('takbir.mp3', { method: 'HEAD' })
+      .then(r => { if (r.ok) window.__athanFile = 'takbir.mp3'; })
+      .catch(() => {});
+  } catch {}
+}
+
 /* ---------- الأيقونات ---------- */
 const I = {
   home: '<path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
@@ -445,6 +479,7 @@ const I = {
   shield: '<path d="M12 3.5l7 2.6v5.3c0 4-3 7.3-7 9.1-4-1.8-7-5.1-7-9.1V6.1z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
   mosque: '<path d="M12 3.2c2.2 1.7 3.4 3 3.4 4.4H8.6c0-1.4 1.2-2.7 3.4-4.4zM6 20V9.6h12V20M4 20h16M10 20v-4a2 2 0 014 0v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   bed: '<path d="M4 18v-9m0 5h16v4m0-4a3 3 0 00-3-3h-6v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  share: '<path d="M12 3.5v11m0-11L8.4 7.1M12 3.5l3.6 3.6M5.5 13v5.5a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   pin: '<path d="M12 21s6-5.6 6-10a6 6 0 10-12 0c0 4.4 6 10 6 10z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/>'
 };
 const svg = (k, fill) => `<svg viewBox="0 0 24 24" aria-hidden="true"${fill ? ' fill="currentColor"' : ''}>${I[k]}</svg>`;
@@ -662,7 +697,7 @@ function checkPrayers() {
     }
     if (diff <= 0 && diff > -1.2 && !fired.v['a' + k]) {
       markFired('a' + k);
-      if (prefs.chime === 'takbir') snd.takbir(true);
+      if (prefs.chime === 'takbir') snd.athan(true);
       else if (prefs.chime === 'soft') snd.alert(true);
       if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB[k] || [400]);
       const msg = `حان الآن وقت صلاة ${name} بتوقيت ${currentCity().n}`;
@@ -676,7 +711,9 @@ setInterval(checkPrayers, 20000);
 /* ---------- البيانات ---------- */
 let QURAN = null, ADHKAR = null;
 const embedded = id => { const el = document.getElementById(id); return el ? JSON.parse(el.textContent) : null; };
-const loadJSON = async p => (await fetch(p, { cache: 'force-cache' })).json();
+const loadJSON = async p => window.fetch
+  ? (await fetch(p, { cache: 'force-cache' })).json()
+  : Promise.reject(new Error('لا يدعم هذا المتصفح جلب الملفات'));
 async function quran() { return QURAN || (QURAN = embedded('d-quran') || await loadJSON('data/quran.json')); }
 async function adhkar() { return ADHKAR || (ADHKAR = embedded('d-adhkar') || await loadJSON('data/adhkar.json')); }
 
@@ -751,6 +788,85 @@ function installCard() {
     </section>`;
 }
 
+
+/* ================= المشاركة =================
+   خياران: رابط التطبيق (يُثبَّت ويتحدّث)، أو ملف التطبيق نفسه (يبقى بلا استضافة). */
+const SHARE_TITLE = 'سَحَر — المصحف الشريف والأذكار ومواقيت الصلاة';
+const SHARE_TEXT = 'المصحف كاملاً، وأذكار الصباح والمساء وما بعد الصلاة، ومواقيت الصلاة.\n' +
+  'بلا إعلانات · يعمل بدون إنترنت · لا يجمع أي بيانات · حجمه ٢ ميجابايت';
+
+/* نسخة مكتفية بذاتها من التطبيق: نجلب الملف الأصلي، وإلا نبني نسخة من الصفحة نفسها */
+async function appFileBlob() {
+  if (window.fetch && location.protocol.startsWith('http')) {
+    try {
+      const r = await fetch('sahar-mushaf.html');
+      if (r.ok) return await r.blob();
+    } catch {}
+  }
+  const doc = document.documentElement.cloneNode(true);
+  const v = doc.querySelector('#view'); if (v) v.innerHTML = '';
+  doc.querySelectorAll('.toast, .sheet-backdrop:not([hidden])').forEach(x => x.remove());
+  const sh = doc.querySelector('#sheet'); if (sh) { sh.innerHTML = ''; sh.setAttribute('hidden', ''); }
+  return new Blob(['<!DOCTYPE html>\n' + doc.outerHTML], { type: 'text/html' });
+}
+
+async function shareLink() {
+  const url = location.protocol.startsWith('http')
+    ? location.href.split('#')[0] : '';
+  if (!url) { shareFile(); return; }
+  const data = { title: SHARE_TITLE, text: SHARE_TEXT, url };
+  if (navigator.share) {
+    try { await navigator.share(data); return; } catch { return; }
+  }
+  try {
+    await navigator.clipboard.writeText(SHARE_TITLE + '\n' + SHARE_TEXT + '\n' + url);
+    banner('تم النسخ', 'نُسخ رابط التطبيق — الصقه في أي محادثة');
+  } catch {
+    openSheet(`<h3>رابط التطبيق</h3>
+      <p class="hint" style="word-break:break-all">${esc(url)}</p>
+      <div class="sheet-actions"><button data-close>إغلاق</button></div>`);
+  }
+}
+
+async function shareFile() {
+  const btn = $('#shareFileBtn');
+  if (btn) btn.textContent = 'جارٍ التجهيز…';
+  let blob;
+  try { blob = await appFileBlob(); }
+  catch { if (btn) btn.textContent = 'تعذّر تجهيز الملف'; return; }
+
+  const file = new File([blob], 'سحر-المصحف-والاذكار.html', { type: 'text/html' });
+  if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+    try { await navigator.share({ files: [file], title: SHARE_TITLE, text: SHARE_TEXT }); }
+    catch {}
+    if (btn) btn.textContent = 'مشاركة ملف التطبيق';
+    return;
+  }
+  /* لا يدعم المتصفح مشاركة الملفات: ننزّله ليرسله المستخدم بنفسه */
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'سحر-المصحف-والاذكار.html';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  if (btn) btn.textContent = 'مشاركة ملف التطبيق';
+  banner('نُزّل الملف', 'أرسله الآن من تطبيق المراسلة كأي مستند');
+}
+
+function openShare() {
+  const online = location.protocol.startsWith('http');
+  openSheet(`
+    <h3>مشاركة التطبيق</h3>
+    <div class="sheet-actions">
+      ${online ? `<button id="shareLinkBtn"><b>مشاركة رابط التطبيق</b>
+        <span class="hint" style="display:block">يفتح فوراً، ويُثبَّت على الشاشة الرئيسية، ويصله كل تحديث</span></button>` : ''}
+      <button id="shareFileBtn"><b>مشاركة ملف التطبيق</b>
+        <span class="hint" style="display:block">ملف واحد يعمل بلا إنترنت وبلا استضافة، يبقى معه ما بقي</span></button>
+      <button data-close>إغلاق</button>
+    </div>`);
+  const l = $('#shareLinkBtn'); if (l) l.onclick = () => { closeSheet(); shareLink(); };
+  const f = $('#shareFileBtn'); if (f) f.onclick = shareFile;
+}
+
 /* ================= الرئيسية (الغلاف) ================= */
 async function viewHome() {
   setBar('سَحَر', 'المصحف · الأذكار · المواقيت'); setTab('home');
@@ -778,6 +894,10 @@ async function viewHome() {
       <div><b>متابعة القراءة</b><small>سورة ${esc(q.surahs[last.s - 1].n)} — الآية ${AR(last.a)}</small></div>
       <span class="arrow">‹</span></a>` : ''}
 
+    <button class="sharebtn" id="shareBtn">
+      ${svg('share')}<span>شارك التطبيق</span>
+    </button>
+
     <div class="tiles">
       <a class="tile" href="#/mushaf"><span class="ico">${svg('book')}</span>
         <b>المصحف</b><small>١١٤ سورة · بحث في النص · علامات</small></a>
@@ -790,6 +910,8 @@ async function viewHome() {
 
     <p class="hint" style="text-align:center;margin-top:16px">
       كل شيء داخل جهازك. لا يُرسل التطبيق أي بيانات إلى أي جهة.</p>`;
+
+  $('#shareBtn').onclick = () => { snd.open(); openShare(); };
 
   if (deferredPrompt && $('#installNow')) {
     const b = $('#installNow'); b.hidden = false;
@@ -868,7 +990,7 @@ function viewTimes() {
           </div></div>
         <div class="set-row"><label>نغمة دخول الوقت</label>
           <div class="chips" id="ch">
-            <button class="chip" data-v="takbir" aria-pressed="${prefs.chime === 'takbir'}">تكبيرتان</button>
+            <button class="chip" data-v="takbir" aria-pressed="${prefs.chime === 'takbir'}">${window.__athanFile ? 'تسجيل الأذان' : 'نغمة مطوّلة'}</button>
             <button class="chip" data-v="soft" aria-pressed="${prefs.chime === 'soft'}">نغمة هادئة</button>
             <button class="chip" data-v="none" aria-pressed="${prefs.chime === 'none'}">صامت</button>
           </div></div>
@@ -884,6 +1006,10 @@ function viewTimes() {
       </div>
       <p class="hint" style="margin-top:9px">التنبيه يعمل والتطبيق مفتوح. وللتنبيه والجهاز مغلق
         يلزم تطبيق أندرويد المبني من نفس المشروع.</p>
+      ${window.__athanFile ? '' : `<div class="notice"><b>لتشغيل أذان بصوت حقيقي:</b><br>
+        ضع ملفاً صوتياً باسم <b>takbir.mp3</b> بجوار ملفات التطبيق، فيشتغل تلقائياً بدل النغمة.
+        النغمة الحالية نغمة إعلان وليست تكبيراً بصوت بشري — والصوت البشري يحتاج تسجيلاً
+        تملك حق نشره.</div>`}
 
       <div class="notice">
         الأوقات محسوبة فلكياً داخل جهازك بتوقيته المحلي، وقد تختلف دقيقة أو دقيقتين عن
@@ -914,7 +1040,7 @@ function viewTimes() {
     pick('vb', 'vib', v => v === '1');
 
     $('#try').onclick = () => {
-      if (prefs.chime === 'takbir') snd.takbir(true);
+      if (prefs.chime === 'takbir') snd.athan(true);
       else if (prefs.chime === 'soft') snd.alert(true);
       if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB.maghrib);
       banner('تجربة', 'هكذا سيصلك التنبيه عند دخول وقت الصلاة');

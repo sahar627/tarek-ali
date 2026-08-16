@@ -1,12 +1,7 @@
-/* سَحَر — عامل الخدمة: تخزين كل الملفات للعمل بدون إنترنت */
-const V = 'sahar-v3';
-const ASSETS = [
-  './', './index.html', './app.css', './app.js', './manifest.webmanifest',
-  './data/quran.json', './data/adhkar.json',
-  './fonts/amiri-quran.woff2', './fonts/amiri.woff2',
-  './icons/icon-192.png', './icons/icon-512.png',
-  './icons/icon-maskable.png', './icons/icon-180.png'
-];
+/* سَحَر — عامل الخدمة (النسخة المسطّحة) */
+const V = 'sahar-flat-v3';
+const ASSETS = ['./', './index.html', './manifest.webmanifest',
+  './icon-192.png', './icon-512.png', './icon-maskable.png', './icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
@@ -15,7 +10,6 @@ self.addEventListener('install', e => {
     self.skipWaiting();
   })());
 });
-
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
@@ -23,7 +17,6 @@ self.addEventListener('activate', e => {
     await self.clients.claim();
   })());
 });
-
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
@@ -35,10 +28,7 @@ self.addEventListener('fetch', e => {
       if (res.ok) (await caches.open(V)).put(req, res.clone());
       return res;
     } catch {
-      return (await caches.match('./index.html')) ||
-        new Response('التطبيق غير متصل ولم يُخزَّن هذا الملف بعد.', {
-          status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-        });
+      return (await caches.match('./index.html')) || new Response('غير متصل', { status: 503 });
     }
   })());
 });
