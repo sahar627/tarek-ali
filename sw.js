@@ -1,7 +1,7 @@
 /* سَحَر — عامل الخدمة (النسخة المسطّحة) */
-const V = 'sahar-flat-v3';
+const V = 'sahar-flat-v4';
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
-  './icon-192.png', './icon-512.png', './icon-maskable.png', './icon-180.png'];
+  './icon-192.png', './icon-512.png', './icon-maskable.png', './icon-180.png', './og.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
