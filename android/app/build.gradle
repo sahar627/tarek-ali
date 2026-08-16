@@ -1,0 +1,44 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.sahar.mushaf'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.sahar.mushaf"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    /* مفتاح التوقيع: يُقرأ من متغيّرات البيئة إن وُجدت، وإلا يُستعمل مفتاح التطوير
+       حتى يخرج ملف APK قابل للتثبيت في كل الأحوال. */
+    signingConfigs {
+        release {
+            def ks = System.getenv("SAHAR_KEYSTORE")
+            if (ks != null && new File(ks).exists()) {
+                storeFile file(ks)
+                storePassword System.getenv("SAHAR_STORE_PASSWORD")
+                keyAlias System.getenv("SAHAR_KEY_ALIAS")
+                keyPassword System.getenv("SAHAR_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            def ks = System.getenv("SAHAR_KEYSTORE")
+            signingConfig (ks != null && new File(ks).exists())
+                ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies { }
