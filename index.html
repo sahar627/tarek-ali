@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>سَحَر — المصحف الشريف والأذكار ومواقيت الصلاة</title>
+<meta name="description" content="المصحف الشريف كاملاً، وأذكار الصباح والمساء وما بعد الصلاة، ومواقيت الصلاة. بلا إعلانات، بلا تتبّع، ويعمل بدون إنترنت.">
+<meta name="theme-color" content="#0A100E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="سَحَر">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="icon-btn" id="backBtn" hidden aria-label="رجوع">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="icon-btn" id="themeBtn" aria-label="تبديل المظهر"></button>
+  <div class="topbar-title"><strong id="title">سَحَر</strong><span id="subtitle"></span></div>
+  <button class="icon-btn" id="settingsBtn" aria-label="الإعدادات">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9m4 0h3M4 12h3m4 0h9M4 17h9m4 0h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="12" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="15" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+  </button>
+</header>
+
+<main id="view" tabindex="-1"></main>
+
+<nav class="tabbar" aria-label="التنقّل الرئيسي">
+  <a href="#/home" class="tab" data-tab="home">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>الرئيسية</span></a>
+  <a href="#/mushaf" class="tab" data-tab="mushaf">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-2-1.6-4.3-2.2-7-2v13c2.7-.2 5 .4 7 2 2-1.6 4.3-2.2 7-2V4c-2.7-.2-5 .4-7 2zm0 0v13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>المصحف</span></a>
+  <a href="#/adhkar" class="tab" data-tab="adhkar">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="4.6" r="1.9"/><circle cx="17.5" cy="8.2" r="1.9"/><circle cx="19" cy="14.6" r="1.9"/><circle cx="12" cy="19" r="1.9"/><circle cx="5" cy="14.6" r="1.9"/><circle cx="6.5" cy="8.2" r="1.9"/></svg>
+    <span>الأذكار</span></a>
+  <a href="#/times" class="tab" data-tab="times">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.4V12l3 1.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>المواقيت</span></a>
+</nav>
+
+<div class="sheet-backdrop" id="backdrop" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

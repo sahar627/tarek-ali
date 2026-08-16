@@ -1,0 +1,45 @@
+{
+  "name": "سَحَر — المصحف والأذكار ومواقيت الصلاة",
+  "short_name": "سَحَر",
+  "description": "المصحف الشريف، وأذكار الصباح والمساء وما بعد الصلاة، ومواقيت الصلاة. بلا إعلانات ويعمل بدون إنترنت.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A100E",
+  "theme_color": "#0A100E",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "أذكار الصباح",
+      "url": "./index.html#/z/1"
+    },
+    {
+      "name": "أذكار المساء",
+      "url": "./index.html#/z/2"
+    },
+    {
+      "name": "مواقيت الصلاة",
+      "url": "./index.html#/times"
+    }
+  ]
+}
