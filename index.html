@@ -161,13 +161,17 @@ main{padding:14px 13px 30px;max-width:760px;margin-inline:auto}
 .tile.wide{grid-column:1 / -1;flex-direction:row;align-items:center;gap:12px}
 .tile.wide div{flex:1}
 
-.next{padding:14px;border:1px solid var(--accent-line);border-radius:var(--r);
-  background:var(--accent-dim);margin-top:11px}
-.next .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.next .top b{font-size:1.3rem;color:var(--accent);font-weight:700}
-.next .top span{font-family:system-ui,sans-serif;font-size:.85rem;color:var(--ink);opacity:.8}
-.next .cd{font-family:system-ui,sans-serif;font-size:1.5rem;font-weight:700;
-  letter-spacing:.03em;margin-top:2px;font-variant-numeric:tabular-nums}
+.next{margin-top:11px;padding:16px 14px 14px;border:1px solid var(--accent-line);
+  border-radius:var(--r);background:var(--accent-dim);display:flex;flex-direction:column;
+  align-items:center;text-align:center;gap:4px}
+.next .lbl{font-family:system-ui,sans-serif;font-size:.78rem;color:var(--ink);opacity:.7}
+.next .pname{font-size:1.5rem;font-weight:700;color:var(--accent);line-height:1.4}
+.next .cd{display:inline-block;margin-top:4px;padding:8px 22px;border:1px solid var(--accent);
+  border-radius:10px;background:var(--surface);color:var(--ink);
+  font-family:system-ui,sans-serif;font-size:1.45rem;font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.next .place{margin-top:6px;font-family:system-ui,sans-serif;font-size:.82rem;
+  color:var(--ink);opacity:.75}
 
 /* ===== المواقيت ===== */
 .times{display:flex;flex-direction:column;gap:7px;margin-top:11px}
@@ -775,21 +779,27 @@ function installCard() {
         <small>يعمل بلا إنترنت وبلا استضافة. أرسله كما هو لمن شئت.</small></div></div>
     </section>`;
 
+  /* إن كان المتصفح يدعم التثبيت بضغطة، لا داعي لأي خطوات */
+  if (deferredPrompt) return `
+    <section class="install">
+      <div class="ih"><span class="ico g">${svg('pin')}</span>
+        <div><b>ثبّته على جهازك</b>
+        <small>يفتح بضغطة واحدة، بملء الشاشة، ويعمل بلا إنترنت.</small></div></div>
+      <button class="ibtn" id="installNow">تثبيت التطبيق</button>
+    </section>`;
+
   const ua = navigator.userAgent;
   const ios = /iPad|iPhone|iPod/.test(ua) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const android = /Android/.test(ua);
   const steps = ios
-    ? ['افتح الصفحة بمتصفح <b>Safari</b>',
-       'اضغط زر المشاركة <b>⬆</b> في الأسفل',
+    ? ['اضغط زر المشاركة <b>⬆</b> في متصفح Safari',
        'اختر <b>«إضافة إلى الشاشة الرئيسية»</b>']
     : android
     ? ['اضغط قائمة المتصفح <b>⋮</b> في الأعلى',
-       'اختر <b>«تثبيت التطبيق»</b> أو <b>«إضافة إلى الشاشة الرئيسية»</b>',
-       'ستظهر أيقونة التطبيق مع بقية تطبيقاتك']
+       'اختر <b>«تثبيت التطبيق»</b>']
     : ['اضغط أيقونة التثبيت <b>⊕</b> في شريط العنوان',
-       'أو من قائمة المتصفح اختر <b>«تثبيت»</b>',
-       'ستظهر أيقونة التطبيق على سطح المكتب'];
+       'أو اختر <b>«تثبيت»</b> من قائمة المتصفح'];
 
   return `
     <section class="install">
@@ -797,87 +807,7 @@ function installCard() {
         <div><b>ثبّته على ${ios || android ? 'شاشتك الرئيسية' : 'سطح المكتب'}</b>
         <small>يفتح بضغطة واحدة، بملء الشاشة، ويعمل بلا إنترنت.</small></div></div>
       <ol class="isteps">${steps.map(t => '<li>' + t + '</li>').join('')}</ol>
-      <button class="ibtn" id="installNow" hidden>تثبيت الآن بضغطة واحدة</button>
     </section>`;
-}
-
-
-/* ================= المشاركة =================
-   خياران: رابط التطبيق (يُثبَّت ويتحدّث)، أو ملف التطبيق نفسه (يبقى بلا استضافة). */
-const SHARE_TITLE = 'سَحَر — المصحف الشريف والأذكار ومواقيت الصلاة';
-const SHARE_TEXT = 'المصحف كاملاً، وأذكار الصباح والمساء وما بعد الصلاة، ومواقيت الصلاة.\n' +
-  'بلا إعلانات · يعمل بدون إنترنت · لا يجمع أي بيانات · حجمه ٢ ميجابايت';
-
-/* نسخة مكتفية بذاتها من التطبيق: نجلب الملف الأصلي، وإلا نبني نسخة من الصفحة نفسها */
-async function appFileBlob() {
-  if (window.fetch && location.protocol.startsWith('http')) {
-    try {
-      const r = await fetch('sahar-mushaf.html');
-      if (r.ok) return await r.blob();
-    } catch {}
-  }
-  const doc = document.documentElement.cloneNode(true);
-  const v = doc.querySelector('#view'); if (v) v.innerHTML = '';
-  doc.querySelectorAll('.toast, .sheet-backdrop:not([hidden])').forEach(x => x.remove());
-  const sh = doc.querySelector('#sheet'); if (sh) { sh.innerHTML = ''; sh.setAttribute('hidden', ''); }
-  return new Blob(['<!DOCTYPE html>\n' + doc.outerHTML], { type: 'text/html' });
-}
-
-async function shareLink() {
-  const url = location.protocol.startsWith('http')
-    ? location.href.split('#')[0] : '';
-  if (!url) { shareFile(); return; }
-  const data = { title: SHARE_TITLE, text: SHARE_TEXT, url };
-  if (navigator.share) {
-    try { await navigator.share(data); return; } catch { return; }
-  }
-  try {
-    await navigator.clipboard.writeText(SHARE_TITLE + '\n' + SHARE_TEXT + '\n' + url);
-    banner('تم النسخ', 'نُسخ رابط التطبيق — الصقه في أي محادثة');
-  } catch {
-    openSheet(`<h3>رابط التطبيق</h3>
-      <p class="hint" style="word-break:break-all">${esc(url)}</p>
-      <div class="sheet-actions"><button data-close>إغلاق</button></div>`);
-  }
-}
-
-async function shareFile() {
-  const btn = $('#shareFileBtn');
-  if (btn) btn.textContent = 'جارٍ التجهيز…';
-  let blob;
-  try { blob = await appFileBlob(); }
-  catch { if (btn) btn.textContent = 'تعذّر تجهيز الملف'; return; }
-
-  const file = new File([blob], 'سحر-المصحف-والاذكار.html', { type: 'text/html' });
-  if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-    try { await navigator.share({ files: [file], title: SHARE_TITLE, text: SHARE_TEXT }); }
-    catch {}
-    if (btn) btn.textContent = 'مشاركة ملف التطبيق';
-    return;
-  }
-  /* لا يدعم المتصفح مشاركة الملفات: ننزّله ليرسله المستخدم بنفسه */
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'سحر-المصحف-والاذكار.html';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-  if (btn) btn.textContent = 'مشاركة ملف التطبيق';
-  banner('نُزّل الملف', 'أرسله الآن من تطبيق المراسلة كأي مستند');
-}
-
-function openShare() {
-  const online = location.protocol.startsWith('http');
-  openSheet(`
-    <h3>مشاركة التطبيق</h3>
-    <div class="sheet-actions">
-      ${online ? `<button id="shareLinkBtn"><b>مشاركة رابط التطبيق</b>
-        <span class="hint" style="display:block">يفتح فوراً، ويُثبَّت على الشاشة الرئيسية، ويصله كل تحديث</span></button>` : ''}
-      <button id="shareFileBtn"><b>مشاركة ملف التطبيق</b>
-        <span class="hint" style="display:block">ملف واحد يعمل بلا إنترنت وبلا استضافة، يبقى معه ما بقي</span></button>
-      <button data-close>إغلاق</button>
-    </div>`);
-  const l = $('#shareLinkBtn'); if (l) l.onclick = () => { closeSheet(); shareLink(); };
-  const f = $('#shareFileBtn'); if (f) f.onclick = shareFile;
 }
 
 /* ================= الرئيسية (الغلاف) ================= */
@@ -898,8 +828,10 @@ async function viewHome() {
     ${installCard()}
 
     <a class="next" href="#/times" id="nextCard">
-      <div class="top"><b>${esc(np.name)}</b><span>${esc(currentCity().n)}${hj ? ' · ' + esc(hj) : ''}</span></div>
-      <div class="cd" id="cd">بعد ${dur(np.left)}</div>
+      <span class="lbl">الصلاة القادمة</span>
+      <b class="pname">${esc(np.name)}</b>
+      <span class="cd" id="cd">${dur(np.left)}</span>
+      <span class="place">${esc(currentCity().n)}${hj ? ' · ' + esc(hj) : ''}</span>
     </a>
 
     ${last ? `<a class="tile wide" href="#/s/${last.s}/${last.a}" style="margin-top:9px">
@@ -938,8 +870,8 @@ async function viewHome() {
   ticker = setInterval(() => {
     const el = $('#cd'); if (!el) return stopTicker();
     const n = nextPrayer();
-    el.textContent = 'بعد ' + dur(n.left);
-    const b = $('#nextCard b'); if (b) b.textContent = n.name;
+    el.textContent = dur(n.left);
+    const b = $('#nextCard .pname'); if (b) b.textContent = n.name;
   }, 1000);
 }
 
@@ -957,10 +889,11 @@ function viewTimes() {
 
     view.innerHTML = `
       <div class="next">
-        <div class="top"><b>${esc(np.name)}</b><span>${esc(c.n)}</span></div>
-        <div class="cd" id="cd2">بعد ${dur(np.left)}</div>
+        <span class="lbl">الصلاة القادمة</span>
+        <b class="pname">${esc(np.name)}</b>
+        <span class="cd" id="cd2">${dur(np.left)}</span>
+        <span class="place">${esc(c.n)}${hj ? ' · ' + esc(hj) : ''}</span>
       </div>
-      ${hj ? `<p class="hint" style="text-align:center;margin:9px 0 0">${esc(hj)}</p>` : ''}
 
       <div class="times">
         ${PRAYERS.map(([k, name, ic]) => `
@@ -1078,7 +1011,7 @@ function viewTimes() {
     stopTicker();
     ticker = setInterval(() => {
       const el = $('#cd2'); if (!el) return stopTicker();
-      el.textContent = 'بعد ' + dur(nextPrayer().left);
+      el.textContent = dur(nextPrayer().left);
     }, 1000);
   }
 }
