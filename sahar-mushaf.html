@@ -300,6 +300,15 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .sharebtn:active{opacity:.85}
 .sheet-actions button b{display:block;font-size:1.05rem;margin-bottom:2px}
 
+/* ===== زر التثبيت: لون وإطار مميّزان عن كل ما سواه ===== */
+.installbtn{width:100%;margin-top:12px;padding:17px;display:flex;align-items:center;
+  justify-content:center;gap:11px;border-radius:14px;
+  background:var(--gold);border:3px solid var(--gold-line);color:#1A1206;
+  font-size:1.22rem;font-weight:700;
+  box-shadow:0 0 0 1px var(--gold-dim), 0 6px 18px rgba(0,0,0,.35)}
+.installbtn svg{width:24px;height:24px}
+.installbtn:active{transform:scale(.985);opacity:.92}
+
 </style>
 </head>
 <body>
@@ -495,6 +504,7 @@ const I = {
   mosque: '<path d="M12 3.2c2.2 1.7 3.4 3 3.4 4.4H8.6c0-1.4 1.2-2.7 3.4-4.4zM6 20V9.6h12V20M4 20h16M10 20v-4a2 2 0 014 0v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   bed: '<path d="M4 18v-9m0 5h16v4m0-4a3 3 0 00-3-3h-6v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.7"/>',
   share: '<path d="M12 3.5v11m0-11L8.4 7.1M12 3.5l3.6 3.6M5.5 13v5.5a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  down: '<path d="M12 3.5v11m0 0l-3.6-3.6M12 14.5l3.6-3.6M5.5 17v1.5a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   pin: '<path d="M12 21s6-5.6 6-10a6 6 0 10-12 0c0 4.4 6 10 6 10z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/>'
 };
 const svg = (k, fill) => `<svg viewBox="0 0 24 24" aria-hidden="true"${fill ? ' fill="currentColor"' : ''}>${I[k]}</svg>`;
@@ -766,46 +776,66 @@ let ticker = null;
 const stopTicker = () => { if (ticker) { clearInterval(ticker); ticker = null; } };
 
 
-/* بطاقة «ثبّته على جهازك» — تظهر فقط قبل التثبيت، وتتغيّر حسب الجهاز */
+/* بطاقة التثبيت: زر واحد بارز دائماً. الخطوات تُعرض فقط عند الحاجة وبعد الضغط. */
+function isStandalone() {
+  return mq('(display-mode: standalone)').matches || navigator.standalone;
+}
 function installCard() {
-  const standalone = mq('(display-mode: standalone)').matches || navigator.standalone;
-  if (standalone) return '';
+  if (isStandalone()) return '';
   if (location.protocol === 'file:') return `
     <section class="install">
       <div class="ih"><span class="ico g">${svg('pin')}</span>
         <div><b>احفظ نسخة من هذا الملف</b>
         <small>يعمل بلا إنترنت وبلا استضافة. أرسله كما هو لمن شئت.</small></div></div>
     </section>`;
+  return `
+    <button class="installbtn" id="installNow">
+      ${svg('down')}<span>تثبيت التطبيق على جهازك</span>
+    </button>
+    <p class="hint" style="text-align:center;margin:7px 0 0">
+      يفتح بضغطة واحدة، بملء الشاشة، ويعمل بلا إنترنت</p>`;
+}
 
-  /* إن كان المتصفح يدعم التثبيت بضغطة، لا داعي لأي خطوات */
-  if (deferredPrompt) return `
-    <section class="install">
-      <div class="ih"><span class="ico g">${svg('pin')}</span>
-        <div><b>ثبّته على جهازك</b>
-        <small>يفتح بضغطة واحدة، بملء الشاشة، ويعمل بلا إنترنت.</small></div></div>
-      <button class="ibtn" id="installNow">تثبيت التطبيق</button>
-    </section>`;
-
+/* خطوات يدوية — تُعرض فقط إن كان المتصفح لا يدعم التثبيت المباشر */
+function installHelp() {
   const ua = navigator.userAgent;
   const ios = /iPad|iPhone|iPod/.test(ua) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const android = /Android/.test(ua);
-  const steps = ios
-    ? ['اضغط زر المشاركة <b>⬆</b> في متصفح Safari',
-       'اختر <b>«إضافة إلى الشاشة الرئيسية»</b>']
-    : android
-    ? ['اضغط قائمة المتصفح <b>⋮</b> في الأعلى',
-       'اختر <b>«تثبيت التطبيق»</b>']
-    : ['اضغط أيقونة التثبيت <b>⊕</b> في شريط العنوان',
-       'أو اختر <b>«تثبيت»</b> من قائمة المتصفح'];
+  const chrome = /Chrome\//.test(ua) && !/EdgA|OPR|SamsungBrowser|YaBrowser|MiuiBrowser/.test(ua);
 
-  return `
-    <section class="install">
-      <div class="ih"><span class="ico g">${svg('pin')}</span>
-        <div><b>ثبّته على ${ios || android ? 'شاشتك الرئيسية' : 'سطح المكتب'}</b>
-        <small>يفتح بضغطة واحدة، بملء الشاشة، ويعمل بلا إنترنت.</small></div></div>
-      <ol class="isteps">${steps.map(t => '<li>' + t + '</li>').join('')}</ol>
-    </section>`;
+  let steps, note = '';
+  if (ios) {
+    steps = ['افتح هذه الصفحة بمتصفح <b>Safari</b>',
+             'اضغط زر المشاركة <b>⬆</b> في أسفل الشاشة',
+             'اختر <b>«إضافة إلى الشاشة الرئيسية»</b>'];
+  } else if (android && !chrome) {
+    steps = ['انسخ رابط الصفحة',
+             'افتحه بمتصفح <b>Chrome</b>',
+             'سيظهر زر التثبيت مباشرة'];
+    note = 'متصفحك الحالي لا يدعم تثبيت التطبيقات. Chrome يدعمه.';
+  } else if (android) {
+    steps = ['اضغط <b>⋮</b> في أعلى المتصفح',
+             'اختر <b>«إضافة إلى الشاشة الرئيسية»</b>',
+             'ثم <b>«تثبيت»</b>'];
+  } else {
+    steps = ['اضغط أيقونة التثبيت <b>⊕</b> في شريط العنوان',
+             'أو اختر <b>«تثبيت»</b> من قائمة المتصفح'];
+  }
+  openSheet(`
+    <h3>تثبيت التطبيق</h3>
+    ${note ? `<p class="hint" style="margin:0 0 10px">${note}</p>` : ''}
+    <ol class="isteps">${steps.map(t => '<li>' + t + '</li>').join('')}</ol>
+    <div class="sheet-actions"><button data-close>حسناً</button></div>`);
+}
+
+async function doInstall() {
+  if (deferredPrompt) {
+    const p = deferredPrompt; deferredPrompt = null;
+    try { p.prompt(); await p.userChoice; } catch {}
+    return;
+  }
+  installHelp();
 }
 
 /* ================= الرئيسية (الغلاف) ================= */
@@ -856,13 +886,7 @@ async function viewHome() {
 
   $('#shareBtn').onclick = () => { snd.open(); openShare(); };
 
-  if (deferredPrompt && $('#installNow')) {
-    const b = $('#installNow'); b.hidden = false;
-    b.onclick = async () => {
-      deferredPrompt.prompt(); await deferredPrompt.userChoice;
-      deferredPrompt = null; b.hidden = true;
-    };
-  }
+  const ib = $('#installNow'); if (ib) ib.onclick = doInstall;
 
   stopTicker();
   ticker = setInterval(() => {
@@ -1233,7 +1257,7 @@ function viewSettings() {
       ${ios ? 'من متصفح Safari: زر المشاركة ⬆ ثم «إضافة إلى الشاشة الرئيسية».'
             : 'من قائمة المتصفح: «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».'}
       <br>بعدها يعمل بلا إنترنت.</div>
-      <button class="row" id="install" hidden style="justify-content:center;margin-top:9px">تثبيت التطبيق الآن</button>` : ''}
+      <button class="installbtn" id="install" style="margin-top:9px">${svg('down')}<span>تثبيت التطبيق</span></button>` : ''}
 
     <div class="section-title">عن التطبيق</div>
     <div class="card" style="padding:15px">
@@ -1265,13 +1289,15 @@ function viewSettings() {
   };
   $('#fs').oninput = e => { prefs.q = +e.target.value; store.set('prefs', prefs); applyType(); };
   $('#lh').oninput = e => { prefs.lh = +e.target.value; store.set('prefs', prefs); applyType(); };
-  if (deferredPrompt && $('#install')) {
-    const b = $('#install'); b.hidden = false;
-    b.onclick = async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; b.hidden = true; };
-  }
+  const ib2 = $('#install'); if (ib2) ib2.onclick = doInstall;
 }
 let deferredPrompt = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; });
+addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  const b = $('#installNow'); if (b) b.remove();
+  banner('تم التثبيت', 'ستجد أيقونة «سَحَر» مع بقية تطبيقاتك');
+});
 
 $('#settingsBtn').onclick = () => { location.hash = '#/settings'; };
 

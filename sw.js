@@ -1,5 +1,5 @@
 /* سَحَر — عامل الخدمة (النسخة المسطّحة) */
-const V = 'sahar-flat-v5';
+const V = 'sahar-flat-v6';
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable.png', './icon-180.png', './og.png'];
 
