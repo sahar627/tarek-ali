@@ -315,6 +315,18 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .installbtn svg{width:24px;height:24px}
 .installbtn:active{transform:scale(.985);opacity:.92}
 
+/* ===== القبلة ===== */
+.qcard{padding:16px 14px;background:var(--surface);border:1px solid var(--frame);
+  border-radius:var(--r);text-align:center}
+.qdial{max-width:300px;margin:0 auto}
+.qdial svg{width:100%;height:auto;display:block}
+.qread{margin-top:12px;padding:10px;border:1px solid var(--accent-line);border-radius:10px;
+  background:var(--accent-dim)}
+.qread b{display:block;font-family:system-ui,sans-serif;font-size:1.6rem;font-weight:700;
+  color:var(--accent);font-variant-numeric:tabular-nums}
+.qread span{display:block;font-family:system-ui,sans-serif;font-size:.84rem;
+  color:var(--ink);opacity:.8;margin-top:2px}
+
 </style>
 </head>
 <body>
@@ -535,6 +547,7 @@ const I = {
   mosque: '<path d="M12 3.2c2.2 1.7 3.4 3 3.4 4.4H8.6c0-1.4 1.2-2.7 3.4-4.4zM6 20V9.6h12V20M4 20h16M10 20v-4a2 2 0 014 0v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   bed: '<path d="M4 18v-9m0 5h16v4m0-4a3 3 0 00-3-3h-6v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.7"/>',
   share: '<path d="M12 3.5v11m0-11L8.4 7.1M12 3.5l3.6 3.6M5.5 13v5.5a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  compass: '<circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15.2 8.8l-1.7 4.7-4.7 1.7 1.7-4.7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   down: '<path d="M12 3.5v11m0 0l-3.6-3.6M12 14.5l3.6-3.6M5.5 17v1.5a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   pin: '<path d="M12 21s6-5.6 6-10a6 6 0 10-12 0c0 4.4 6 10 6 10z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/>'
 };
@@ -892,6 +905,132 @@ async function doInstall() {
   installHelp();
 }
 
+
+/* ================= اتجاه القبلة =================
+   الاتجاه الأولي على دائرة عظمى من موضعك إلى الكعبة. */
+const KAABA = { lat: 21.4225, lng: 39.8262 };
+const rad = x => x * Math.PI / 180, deg = x => x * 180 / Math.PI;
+
+function qiblaBearing(lat, lng) {
+  const dL = rad(KAABA.lng - lng);
+  const y = Math.sin(dL) * Math.cos(rad(KAABA.lat));
+  const x = Math.cos(rad(lat)) * Math.sin(rad(KAABA.lat)) -
+            Math.sin(rad(lat)) * Math.cos(rad(KAABA.lat)) * Math.cos(dL);
+  return (deg(Math.atan2(y, x)) + 360) % 360;
+}
+function kaabaDistance(lat, lng) {
+  const p = rad(KAABA.lat - lat), q = rad(KAABA.lng - lng);
+  const a = Math.sin(p / 2) ** 2 +
+            Math.cos(rad(lat)) * Math.cos(rad(KAABA.lat)) * Math.sin(q / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+const dirName = b => ['شمالاً', 'شمالاً شرقياً', 'شرقاً', 'جنوباً شرقياً', 'جنوباً',
+  'جنوباً غربياً', 'غرباً', 'شمالاً غربياً'][Math.round(b / 45) % 8];
+
+let orientHandler = null;
+function stopCompass() {
+  if (orientHandler) {
+    removeEventListener('deviceorientationabsolute', orientHandler);
+    removeEventListener('deviceorientation', orientHandler);
+    orientHandler = null;
+  }
+}
+
+function viewQibla() {
+  setBar('اتجاه القبلة', 'محسوب داخل الجهاز', '#/home'); setTab('times');
+  const c = currentCity();
+  const b = qiblaBearing(c.lat, c.lng);
+  const km = kaabaDistance(c.lat, c.lng);
+
+  view.innerHTML = `
+    <div class="qcard">
+      <div class="qdial" id="dial">
+        <svg viewBox="0 0 240 240" aria-hidden="true">
+          <g id="rose">
+            <circle cx="120" cy="120" r="106" fill="none" stroke="var(--frame)" stroke-width="2"/>
+            <circle cx="120" cy="120" r="92" fill="none" stroke="var(--line)" stroke-width="1"/>
+            ${Array.from({ length: 72 }, (_, i) => {
+              const a = i * 5, L = a % 45 === 0 ? 14 : (a % 15 === 0 ? 9 : 5);
+              return `<line x1="120" y1="14" x2="120" y2="${14 + L}"
+                stroke="${a % 45 === 0 ? 'var(--gold)' : 'var(--frame)'}"
+                stroke-width="${a % 45 === 0 ? 2 : 1}"
+                transform="rotate(${a} 120 120)"/>`;
+            }).join('')}
+            <text x="120" y="46" text-anchor="middle" fill="var(--gold)"
+              font-size="17" font-weight="700" font-family="system-ui">ش</text>
+            <text x="120" y="204" text-anchor="middle" fill="var(--muted)"
+              font-size="15" font-family="system-ui">ج</text>
+            <text x="204" y="126" text-anchor="middle" fill="var(--muted)"
+              font-size="15" font-family="system-ui">ق</text>
+            <text x="36" y="126" text-anchor="middle" fill="var(--muted)"
+              font-size="15" font-family="system-ui">غ</text>
+            <g transform="rotate(${b.toFixed(1)} 120 120)">
+              <line x1="120" y1="120" x2="120" y2="40" stroke="var(--accent)" stroke-width="5"
+                stroke-linecap="round"/>
+              <polygon points="120,26 111,48 129,48" fill="var(--accent)"/>
+              <rect x="112" y="52" width="16" height="16" rx="2" fill="var(--gold)"/>
+            </g>
+          </g>
+          <circle cx="120" cy="120" r="7" fill="var(--ink)"/>
+          <polygon points="120,4 113,17 127,17" fill="var(--gold)"/>
+        </svg>
+      </div>
+      <div class="qread">
+        <b id="qdeg">${AR(Math.round(b))}°</b>
+        <span>عن الشمال · ${dirName(b)}</span>
+      </div>
+      <p class="hint" id="qhint" style="text-align:center;margin:8px 0 0">
+        ${esc(c.n)} · تبعد عن الكعبة ${AR(Math.round(km).toLocaleString('en-US'))} كم</p>
+    </div>
+
+    <button class="row" id="qstart" style="justify-content:center;margin-top:10px;font-family:system-ui;font-size:.9rem">
+      <span class="ico" style="width:34px;height:34px">${svg('compass')}</span> تشغيل البوصلة</button>
+
+    <div class="notice">
+      <b>إن لم تعمل البوصلة:</b> وجّه المؤشّر العلوي الذهبي نحو الشمال الحقيقي،
+      فيشير السهم الأخضر إلى القبلة. أو استعمل الزاوية <b>${AR(Math.round(b))}°</b> مع أي بوصلة.
+    </div>
+    <p class="hint" style="margin-top:10px">
+      الحساب دقيق رياضياً، لكن دقة <b>البوصلة</b> تعتمد على حسّاس جهازك: ابتعد عن الحديد
+      والمغانط والأجهزة، وحرّك جهازك على هيئة الرقم ٨ لمعايرته. وللاحتياط في الصلاة،
+      استأنس بمحراب أقرب مسجد.</p>`;
+
+  $('#qstart').onclick = startCompass;
+
+  async function startCompass() {
+    const btn = $('#qstart');
+    const DOE = window.DeviceOrientationEvent;
+    if (!DOE) { btn.textContent = 'جهازك لا يحتوي حسّاس اتجاه'; return; }
+    if (typeof DOE.requestPermission === 'function') {          /* آيفون */
+      try {
+        const r = await DOE.requestPermission();
+        if (r !== 'granted') { btn.textContent = 'لم يُسمح باستعمال البوصلة'; return; }
+      } catch { btn.textContent = 'تعذّر تشغيل البوصلة'; return; }
+    }
+    let got = false;
+    orientHandler = e => {
+      let heading = null;
+      if (typeof e.webkitCompassHeading === 'number') heading = e.webkitCompassHeading;
+      else if (e.absolute && typeof e.alpha === 'number') heading = (360 - e.alpha) % 360;
+      if (heading === null || isNaN(heading)) return;
+      got = true;
+      const rose = $('#rose'); if (!rose) return stopCompass();
+      rose.setAttribute('transform', `rotate(${(-heading).toFixed(1)} 120 120)`);
+      const off = ((b - heading + 540) % 360) - 180;      /* كم يلزم أن تدور */
+      const q = $('#qdeg');
+      if (q) q.textContent = Math.abs(off) < 5
+        ? 'أنت تواجه القبلة ✓'
+        : (off > 0 ? 'در يميناً ' : 'در يساراً ') + AR(Math.round(Math.abs(off))) + '°';
+    };
+    addEventListener('deviceorientationabsolute', orientHandler);
+    addEventListener('deviceorientation', orientHandler);
+    btn.textContent = 'البوصلة تعمل — وجّه السهم للأعلى';
+    setTimeout(() => {
+      if (!got) { stopCompass(); btn.textContent = 'تعذّر قراءة البوصلة — استعمل الزاوية'; }
+    }, 3000);
+  }
+}
+
 /* ================= الرئيسية (الغلاف) ================= */
 async function viewHome() {
   setBar('سَحَر', 'المصحف · الأذكار · المواقيت'); setTab('home');
@@ -930,9 +1069,10 @@ async function viewHome() {
         <b>المصحف</b><small>١١٤ سورة · بحث في النص · علامات</small></a>
       <a class="tile" href="#/adhkar"><span class="ico">${beadsSvg}</span>
         <b>الأذكار</b><small>الصباح والمساء وبعد الصلاة</small></a>
-      <a class="tile wide" href="#/times"><span class="ico">${svg('clock')}</span>
-        <div><b>مواقيت الصلاة</b><small>محسوبة داخل جهازك بلا اتصال</small></div>
-        <span class="arrow">‹</span></a>
+      <a class="tile" href="#/times"><span class="ico">${svg('clock')}</span>
+        <b>المواقيت</b><small>محسوبة داخل جهازك بلا اتصال</small></a>
+      <a class="tile" href="#/qibla"><span class="ico">${svg('compass')}</span>
+        <b>القبلة</b><small>اتجاه الكعبة من موضعك</small></a>
     </div>
 
     <p class="hint" style="text-align:center;margin-top:16px">
@@ -995,8 +1135,12 @@ function viewTimes() {
             <button class="chip" data-a="2" aria-pressed="${prefs.asr === 2}">الحنفية</button>
           </div></div>
       </div>
-      <button class="row" id="geo" style="justify-content:center;margin-top:9px;font-family:system-ui;font-size:.86rem">
-        <span class="ico" style="width:34px;height:34px">${svg('pin')}</span> تحديد موقعي بدقّة</button>
+      <div style="display:flex;gap:8px;margin-top:9px">
+        <button class="row" id="geo" style="flex:1;justify-content:center;font-family:system-ui;font-size:.86rem">
+          <span class="ico" style="width:34px;height:34px">${svg('pin')}</span> تحديد موقعي</button>
+        <a class="row" href="#/qibla" style="flex:1;justify-content:center;font-family:system-ui;font-size:.86rem">
+          <span class="ico g" style="width:34px;height:34px">${svg('compass')}</span> اتجاه القبلة</a>
+      </div>
 
       <div class="section-title">تنبيهات الصلاة</div>
       <div class="card">
@@ -1387,7 +1531,7 @@ paintThemeBtn();
 /* ---------- التوجيه ---------- */
 let booted = false;
 function route() {
-  closeSheet(); stopTicker();
+  closeSheet(); stopTicker(); stopCompass();
   const p = (location.hash || '#/home').slice(2).split('/');
   if (booted) { p[0] === 's' ? snd.page() : snd.open(); }
   booted = true;
@@ -1396,6 +1540,7 @@ function route() {
   if (p[0] === 'mushaf') return viewMushaf();
   if (p[0] === 'adhkar') return viewAdhkar();
   if (p[0] === 'times') return viewTimes();
+  if (p[0] === 'qibla') return viewQibla();
   if (p[0] === 'settings') return viewSettings();
   return viewHome();
 }
