@@ -2,6 +2,15 @@ package com.sahar.mushaf;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.provider.Settings;
+import android.webkit.JavascriptInterface;
+
+import org.json.JSONObject;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
@@ -38,7 +47,7 @@ public class MainActivity extends Activity {
         web.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         /* لون خلفية مطابق للتطبيق حتى لا تومض شاشة بيضاء عند الفتح */
-        web.setBackgroundColor(Color.parseColor(night ? "#0D1311" : "#F6F2E9"));
+        web.setBackgroundColor(Color.parseColor(night ? "#0A100E" : "#DED3B8"));
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -67,10 +76,101 @@ public class MainActivity extends Activity {
             }
         });
 
+        web.addJavascriptInterface(new Bridge(), "Sahar");
+
         setContentView(web);
 
         if (saved != null) web.restoreState(saved);
         else web.loadUrl("file:///android_asset/index.html");
+
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] { android.Manifest.permission.POST_NOTIFICATIONS }, 77);
+        }
+        Scheduler.scheduleNext(this);
+    }
+
+    /** الجسر بين واجهة الويب وجدولة المنبّه في النظام */
+    private class Bridge {
+
+        @JavascriptInterface
+        public boolean isApp() { return true; }
+
+        /** الأصوات المضمّنة في الحزمة */
+        @JavascriptInterface
+        public String athanList() {
+            return "[" +
+              "{\"id\":\"takbir\",\"name\":\"التكبيرات\"}," +
+              "{\"id\":\"makkah\",\"name\":\"أذان مكة\"}," +
+              "{\"id\":\"madinah\",\"name\":\"أذان المدينة\"}," +
+              "{\"id\":\"fajr\",\"name\":\"أذان الفجر — المدينة\"}," +
+              "{\"id\":\"rifaat\",\"name\":\"الشيخ محمد رفعت\"}]";
+        }
+
+        /** تحفظ الواجهةُ إعداداتِها هنا فيعيد النظام الجدولة */
+        @JavascriptInterface
+        public void syncSettings(String json) {
+            try {
+                JSONObject o = new JSONObject(json);
+                SharedPreferences.Editor e = Scheduler.prefs(MainActivity.this).edit();
+                e.putLong("lat", Double.doubleToLongBits(o.optDouble("lat", 21.4225)));
+                e.putLong("lng", Double.doubleToLongBits(o.optDouble("lng", 39.8262)));
+                e.putString("method", o.optString("method", "makkah"));
+                e.putInt("asr", o.optInt("asr", 1));
+                e.putBoolean("alert", o.optBoolean("alert", true));
+                e.putInt("before", o.optInt("before", 15));
+                e.putString("chime", o.optString("chime", ""));
+                e.putString("chimeFajr", o.optString("chimeFajr", "same"));
+                e.putBoolean("vib", o.optBoolean("vib", true));
+                e.putFloat("vol", (float) o.optDouble("vol", 1));
+                e.apply();
+                Scheduler.scheduleNext(MainActivity.this);
+            } catch (Exception ignored) { }
+        }
+
+        @JavascriptInterface
+        public void playAdhan(String id) {
+            String asset = "audio/takbir.mp3";
+            if ("makkah".equals(id))  asset = "audio/makkah.mp3";
+            if ("madinah".equals(id)) asset = "audio/madinah.mp3";
+            if ("fajr".equals(id))    asset = "audio/madinah-fajr.mp3";
+            if ("rifaat".equals(id))  asset = "audio/rifaat.mp3";
+            Intent i = new Intent(MainActivity.this, AdhanService.class)
+                    .putExtra("asset", asset).putExtra("name", "تجربة");
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i); else startService(i);
+        }
+
+        @JavascriptInterface
+        public void stopAdhan() {
+            startService(new Intent(MainActivity.this, AdhanService.class)
+                    .setAction(AdhanService.ACTION_STOP));
+        }
+
+        /** هل يسمح النظام بالمنبّه الدقيق؟ */
+        @JavascriptInterface
+        public boolean exactAllowed() {
+            if (Build.VERSION.SDK_INT < 31) return true;
+            android.app.AlarmManager am =
+                    (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            return am != null && am.canScheduleExactAlarms();
+        }
+
+        @JavascriptInterface
+        public void openExactSettings() {
+            if (Build.VERSION.SDK_INT < 31) return;
+            try {
+                startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+        }
+
+        @JavascriptInterface
+        public void openBatterySettings() {
+            try {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            } catch (Exception ignored) { }
+        }
     }
 
     /* زر الرجوع يتنقّل داخل التطبيق قبل أن يخرج منه */

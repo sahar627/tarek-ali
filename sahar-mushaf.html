@@ -469,6 +469,9 @@ const snd = {
     const k = key || prefs.chime;
     const id = String(k || '').startsWith('a:') ? k.slice(2) : null;
     const item = id && athanById(id);
+    if (item && NATIVE) {
+      try { stopAudio(); Sahar.playAdhan(id); curAudio = { native: 1 }; return; } catch {}
+    }
     if (item) {
       try {
         stopAudio();
@@ -504,6 +507,28 @@ addEventListener('pointerdown', () => snd.ready(), { once: true });
    كل عنصر: { id, name, file, by }  —  by = نسبة التسجيل لصاحبه ورخصته. */
 let ATHAN = [];
 let curAudio = null;
+/* داخل تطبيق أندرويد: الأصوات والجدولة يتولاها النظام لا المتصفح */
+const NATIVE = !!(window.Sahar && window.Sahar.isApp && window.Sahar.isApp());
+if (NATIVE) {
+  try { ATHAN = JSON.parse(Sahar.athanList()).map(x => ({ ...x, file: '', by: 'مضمّن في التطبيق' })); }
+  catch { ATHAN = []; }
+  if (!prefs.chimeSet && ATHAN.length) {
+    prefs.chime = 'a:takbir'; prefs.chimeFajr = 'a:fajr'; prefs.chimeSet = 1;
+  }
+}
+/* يبلّغ النظامَ بالإعدادات ليعيد جدولة المنبّه */
+function syncNative() {
+  if (!NATIVE) return;
+  const c = currentCity();
+  try {
+    Sahar.syncSettings(JSON.stringify({
+      lat: c.lat, lng: c.lng, method: prefs.method, asr: prefs.asr,
+      alert: prefs.alert !== false, before: +prefs.before || 0,
+      chime: prefs.chime || '', chimeFajr: prefs.chimeFajr || 'same',
+      vib: prefs.vib !== false, vol: prefs.vol ?? 1
+    }));
+  } catch {}
+}
 if (window.fetch && location.protocol.startsWith('http')) {
   try {
     fetch('athan.json')
@@ -526,6 +551,7 @@ if (window.fetch && location.protocol.startsWith('http')) {
 }
 const athanById = id => ATHAN.find(x => x.id === id);
 function stopAudio() {
+  if (NATIVE) { try { Sahar.stopAdhan(); } catch {} }
   if (curAudio) { try { curAudio.pause(); curAudio.currentTime = 0; } catch {} curAudio = null; }
 }
 
@@ -756,19 +782,23 @@ function checkPrayers() {
     if (prefs.before > 0 && diff <= prefs.before && diff > prefs.before - 1.2
         && !fired.v['b' + k]) {
       markFired('b' + k);
-      snd.alert(true);
-      if (prefs.vib && navigator.vibrate) navigator.vibrate([120, 80, 120]);
+      if (!NATIVE) {
+        snd.alert(true);
+        if (prefs.vib && navigator.vibrate) navigator.vibrate([120, 80, 120]);
+      }
       const msg = `اقترب وقت صلاة ${name} — بعد ${AR(Math.round(diff))} دقيقة`;
       banner('تنبيه قبل الأذان', msg);
       notify('سَحَر', msg);
     }
     if (diff <= 0 && diff > -1.2 && !fired.v['a' + k]) {
       markFired('a' + k);
-      const ck = (k === 'fajr' && prefs.chimeFajr && prefs.chimeFajr !== 'same')
-        ? prefs.chimeFajr : prefs.chime;
-      if (ck === 'soft') snd.alert(true);
-      else if (ck !== 'none') snd.athan(true, ck);
-      if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB[k] || [400]);
+      if (!NATIVE) {          /* في التطبيق يتولّى النظامُ الصوتَ والاهتزاز */
+        const ck = (k === 'fajr' && prefs.chimeFajr && prefs.chimeFajr !== 'same')
+          ? prefs.chimeFajr : prefs.chime;
+        if (ck === 'soft') snd.alert(true);
+        else if (ck !== 'none') snd.athan(true, ck);
+        if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB[k] || [400]);
+      }
       const msg = `حان الآن وقت صلاة ${name} بتوقيت ${currentCity().n}`;
       banner('دخل وقت الصلاة', msg);
       notify('سَحَر', msg);
@@ -1182,8 +1212,17 @@ function viewTimes() {
         <button class="row" id="try" style="flex:1;justify-content:center;font-family:system-ui;font-size:.85rem">تجربة النغمة</button>
         <button class="row" id="perm" style="flex:1;justify-content:center;font-family:system-ui;font-size:.85rem">تفعيل الإشعارات</button>
       </div>
-      <p class="hint" style="margin-top:9px">التنبيه يعمل والتطبيق مفتوح. وللتنبيه والجهاز مغلق
-        يلزم تطبيق أندرويد المبني من نفس المشروع.</p>
+      ${NATIVE ? `<div class="notice"><b>الأذان يعمل والتطبيق مغلق.</b><br>
+        النظام يوقظ الجهاز في وقت كل صلاة فيؤذّن، بلا إنترنت وبلا خوادم.
+        ${(() => { try { return Sahar.exactAllowed() ? '' :
+          '<br><br><b>تنبيه:</b> المنبّه الدقيق ممنوع في إعدادات جهازك، وقد يتأخر الأذان دقائق.'; }
+          catch { return ''; } })()}</div>
+        <div style="display:flex;gap:8px;margin-top:9px">
+          <button class="row" id="permExact" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">إذن المنبّه الدقيق</button>
+          <button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>
+        </div>`
+        : `<p class="hint" style="margin-top:9px">التنبيه يعمل والتطبيق مفتوح. وللتنبيه والجهاز مغلق
+        يلزم تطبيق أندرويد المبني من نفس المشروع.</p>`}
       ${ATHAN.length ? '' : `<div class="notice"><b>لإضافة أذان بصوت حقيقي:</b><br>
         ضع ملف <b>athan.json</b> وملفاتك الصوتية بجوار ملفات التطبيق، فتظهر هنا تلقائياً.
         النغمة الحالية نغمة إعلان لا تكبيراً بصوت بشري.</div>`}
@@ -1197,9 +1236,9 @@ function viewTimes() {
       const x = CITIES[+e.target.value];
       prefs.city = { n: x[0], lat: x[1], lng: x[2] };
       prefs.method = x[3];
-      store.set('prefs', prefs); snd.open(); render();
+      store.set('prefs', prefs); syncNative(); snd.open(); render();
     };
-    $('#meth').onchange = e => { prefs.method = e.target.value; store.set('prefs', prefs); render(); };
+    $('#meth').onchange = e => { prefs.method = e.target.value; store.set('prefs', prefs); syncNative(); render(); };
     $('#asr').onclick = e => {
       const b = e.target.closest('.chip'); if (!b) return;
       prefs.asr = +b.dataset.a; store.set('prefs', prefs); snd.tick(); render();
@@ -1208,7 +1247,7 @@ function viewTimes() {
       const el = $('#' + id); if (!el) return;
       el.onclick = e => {
         const b = e.target.closest('.chip'); if (!b) return;
-        prefs[key] = cast(b.dataset.v); store.set('prefs', prefs); snd.tick(); render();
+        prefs[key] = cast(b.dataset.v); store.set('prefs', prefs); syncNative(); snd.tick(); render();
       };
     };
     pick('al', 'alert', v => v === '1');
@@ -1216,7 +1255,10 @@ function viewTimes() {
     pick('ch', 'chime', v => { prefs.chimeSet = 1; return v; });
     pick('chf', 'chimeFajr', v => { prefs.chimeSet = 1; return v; });
     const vv = $('#vol');
-    if (vv) vv.oninput = e => { prefs.vol = +e.target.value; store.set('prefs', prefs); if (curAudio) curAudio.volume = prefs.vol; };
+    if (vv) vv.oninput = e => {
+      prefs.vol = +e.target.value; store.set('prefs', prefs); syncNative();
+      if (curAudio && !curAudio.native) curAudio.volume = prefs.vol;
+    };
     pick('vb', 'vib', v => v === '1');
 
     $('#try').onclick = () => {
@@ -1231,12 +1273,15 @@ function viewTimes() {
       $('#perm').textContent = r === 'granted' ? 'الإشعارات مفعّلة ✓' : 'لم يُسمح بالإشعارات';
     };
 
+    const pe = $('#permExact'); if (pe) pe.onclick = () => { try { Sahar.openExactSettings(); } catch {} };
+    const pb = $('#permBatt'); if (pb) pb.onclick = () => { try { Sahar.openBatterySettings(); } catch {} };
+
     $('#geo').onclick = () => {
       if (!navigator.geolocation) { alert('تحديد الموقع غير متاح في هذا المتصفح.'); return; }
       navigator.geolocation.getCurrentPosition(
         p => {
           prefs.city = { n: 'موقعي', lat: +p.coords.latitude.toFixed(4), lng: +p.coords.longitude.toFixed(4) };
-          store.set('prefs', prefs); snd.open(); render();
+          store.set('prefs', prefs); syncNative(); snd.open(); render();
         },
         () => alert('تعذّر تحديد الموقع. اختر مدينتك من القائمة.'),
         { timeout: 10000 });
@@ -1544,6 +1589,7 @@ function route() {
 }
 addEventListener('hashchange', route);
 route();
+syncNative();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
