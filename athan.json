@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "takbir",
+      "name": "التكبيرات",
+      "file": "takbir.mp3",
+      "by": "مقتطع من أذان المسجد الحرام — المصدر: islamweb.net"
+    },
+    {
+      "id": "makkah",
+      "name": "أذان مكة",
+      "file": "makkah.mp3",
+      "by": "المصدر: islamweb.net"
+    },
+    {
+      "id": "madinah",
+      "name": "أذان المدينة",
+      "file": "madinah.mp3",
+      "by": "المصدر: islamweb.net"
+    },
+    {
+      "id": "fajr",
+      "name": "أذان الفجر — المدينة",
+      "file": "madinah-fajr.mp3",
+      "by": "المصدر: islamweb.net"
+    },
+    {
+      "id": "rifaat",
+      "name": "الشيخ محمد رفعت",
+      "file": "rifaat.mp3",
+      "by": "المصدر: islamweb.net"
+    }
+  ]
+}

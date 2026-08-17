@@ -376,7 +376,7 @@ const store = {
 
 const prefs = Object.assign(
   { theme: 'night', q: 1.45, lh: 2.35, snd: true, city: null, method: 'makkah', asr: 1,
-    alert: true, before: 15, chime: 'takbir', vib: true },
+    alert: true, before: 15, chime: 'takbir', chimeFajr: 'same', vol: 1, vib: true },
   store.get('prefs', {}));
 let marks = store.get('marks', []);
 let last = store.get('last', null);
@@ -448,13 +448,19 @@ const snd = {
     this.phrase(6.8, 261.63);   /* دو — أعلى قليلاً في الختام */
     prefs.snd = saved;
   },
-  /* إن وضع صاحب التطبيق ملف takbir.mp3 بجوار الصفحة شُغّل بدلاً من النغمة */
-  athan(force) {
-    if (window.__athanFile) {
+  /* تشغيل تسجيل من المكتبة إن اختير، وإلا النغمة المولّدة */
+  athan(force, key) {
+    const k = key || prefs.chime;
+    const id = String(k || '').startsWith('a:') ? k.slice(2) : null;
+    const item = id && athanById(id);
+    if (item) {
       try {
-        const a = new Audio(window.__athanFile);
-        a.volume = 1;
+        stopAudio();
+        const a = new Audio(item.file);
+        a.volume = Math.max(0, Math.min(1, prefs.vol ?? 1));
+        curAudio = a;
         a.play().catch(() => this.callTone(force));
+        a.onended = () => { curAudio = null; };
         return;
       } catch { /* يسقط للنغمة */ }
     }
@@ -478,14 +484,33 @@ const snd = {
 };
 addEventListener('pointerdown', () => snd.ready(), { once: true });
 
-/* البحث عن تسجيل أذان اختياري بجوار الصفحة (takbir.mp3) */
-window.__athanFile = null;
+/* مكتبة أصوات الأذان: تُقرأ من athan.json إن وُجد بجوار الصفحة.
+   كل عنصر: { id, name, file, by }  —  by = نسبة التسجيل لصاحبه ورخصته. */
+let ATHAN = [];
+let curAudio = null;
 if (window.fetch && location.protocol.startsWith('http')) {
   try {
-    fetch('takbir.mp3', { method: 'HEAD' })
-      .then(r => { if (r.ok) window.__athanFile = 'takbir.mp3'; })
+    fetch('athan.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(async j => {
+        if (!j || !Array.isArray(j.items)) return;
+        /* لا نعرض إلا التسجيلات المرفوعة فعلاً */
+        const ok = await Promise.all(j.items.map(it =>
+          fetch(it.file, { method: 'HEAD' }).then(r => r.ok).catch(() => false)));
+        ATHAN = j.items.filter((_, i) => ok[i]);
+        /* أول تشغيل: نختار التكبيرات للتنبيه، وأذان الفجر للفجر إن توفّرا */
+        if (!prefs.chimeSet && ATHAN.length) {
+          if (athanById('takbir')) prefs.chime = 'a:takbir';
+          if (athanById('fajr')) prefs.chimeFajr = 'a:fajr';
+          prefs.chimeSet = 1; store.set('prefs', prefs);
+        }
+      })
       .catch(() => {});
   } catch {}
+}
+const athanById = id => ATHAN.find(x => x.id === id);
+function stopAudio() {
+  if (curAudio) { try { curAudio.pause(); curAudio.currentTime = 0; } catch {} curAudio = null; }
 }
 
 /* ---------- الأيقونات ---------- */
@@ -722,8 +747,10 @@ function checkPrayers() {
     }
     if (diff <= 0 && diff > -1.2 && !fired.v['a' + k]) {
       markFired('a' + k);
-      if (prefs.chime === 'takbir') snd.athan(true);
-      else if (prefs.chime === 'soft') snd.alert(true);
+      const ck = (k === 'fajr' && prefs.chimeFajr && prefs.chimeFajr !== 'same')
+        ? prefs.chimeFajr : prefs.chime;
+      if (ck === 'soft') snd.alert(true);
+      else if (ck !== 'none') snd.athan(true, ck);
       if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB[k] || [400]);
       const msg = `حان الآن وقت صلاة ${name} بتوقيت ${currentCity().n}`;
       banner('دخل وقت الصلاة', msg);
@@ -958,10 +985,24 @@ function viewTimes() {
           </div></div>
         <div class="set-row"><label>نغمة دخول الوقت</label>
           <div class="chips" id="ch">
-            <button class="chip" data-v="takbir" aria-pressed="${prefs.chime === 'takbir'}">${window.__athanFile ? 'تسجيل الأذان' : 'نغمة مطوّلة'}</button>
+            ${ATHAN.map(a => `<button class="chip" data-v="a:${esc(a.id)}"
+              aria-pressed="${prefs.chime === 'a:' + a.id}">${esc(a.name)}</button>`).join('')}
+            <button class="chip" data-v="takbir" aria-pressed="${!String(prefs.chime).startsWith('a:') && prefs.chime !== 'soft' && prefs.chime !== 'none'}">نغمة مطوّلة</button>
             <button class="chip" data-v="soft" aria-pressed="${prefs.chime === 'soft'}">نغمة هادئة</button>
             <button class="chip" data-v="none" aria-pressed="${prefs.chime === 'none'}">صامت</button>
           </div></div>
+        ${(() => {
+          const it = String(prefs.chime).startsWith('a:') && athanById(prefs.chime.slice(2));
+          return it && it.by ? `<div class="set-row"><span class="hint">${esc(it.by)}</span></div>` : '';
+        })()}
+        ${ATHAN.length ? `<div class="set-row"><label>أذان الفجر</label>
+          <div class="chips" id="chf">
+            <button class="chip" data-v="same" aria-pressed="${prefs.chimeFajr === 'same'}">مثل الباقي</button>
+            ${ATHAN.map(a => `<button class="chip" data-v="a:${esc(a.id)}"
+              aria-pressed="${prefs.chimeFajr === 'a:' + a.id}">${esc(a.name)}</button>`).join('')}
+          </div></div>
+        <div class="set-row"><label for="vol">مستوى الصوت</label>
+          <input id="vol" type="range" min="0.2" max="1" step="0.05" value="${prefs.vol ?? 1}"></div>` : ''}
         <div class="set-row"><label>الاهتزاز</label>
           <div class="chips" id="vb">
             <button class="chip" data-v="1" aria-pressed="${prefs.vib !== false}">تشغيل</button>
@@ -974,10 +1015,9 @@ function viewTimes() {
       </div>
       <p class="hint" style="margin-top:9px">التنبيه يعمل والتطبيق مفتوح. وللتنبيه والجهاز مغلق
         يلزم تطبيق أندرويد المبني من نفس المشروع.</p>
-      ${window.__athanFile ? '' : `<div class="notice"><b>لتشغيل أذان بصوت حقيقي:</b><br>
-        ضع ملفاً صوتياً باسم <b>takbir.mp3</b> بجوار ملفات التطبيق، فيشتغل تلقائياً بدل النغمة.
-        النغمة الحالية نغمة إعلان وليست تكبيراً بصوت بشري — والصوت البشري يحتاج تسجيلاً
-        تملك حق نشره.</div>`}
+      ${ATHAN.length ? '' : `<div class="notice"><b>لإضافة أذان بصوت حقيقي:</b><br>
+        ضع ملف <b>athan.json</b> وملفاتك الصوتية بجوار ملفات التطبيق، فتظهر هنا تلقائياً.
+        النغمة الحالية نغمة إعلان لا تكبيراً بصوت بشري.</div>`}
 
       <div class="notice">
         الأوقات محسوبة فلكياً داخل جهازك بتوقيته المحلي، وقد تختلف دقيقة أو دقيقتين عن
@@ -1004,12 +1044,15 @@ function viewTimes() {
     };
     pick('al', 'alert', v => v === '1');
     pick('bf', 'before', v => +v);
-    pick('ch', 'chime', v => v);
+    pick('ch', 'chime', v => { prefs.chimeSet = 1; return v; });
+    pick('chf', 'chimeFajr', v => { prefs.chimeSet = 1; return v; });
+    const vv = $('#vol');
+    if (vv) vv.oninput = e => { prefs.vol = +e.target.value; store.set('prefs', prefs); if (curAudio) curAudio.volume = prefs.vol; };
     pick('vb', 'vib', v => v === '1');
 
     $('#try').onclick = () => {
-      if (prefs.chime === 'takbir') snd.athan(true);
-      else if (prefs.chime === 'soft') snd.alert(true);
+      if (prefs.chime === 'soft') snd.alert(true);
+      else if (prefs.chime !== 'none') snd.athan(true);
       if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB.maghrib);
       banner('تجربة', 'هكذا سيصلك التنبيه عند دخول وقت الصلاة');
     };
