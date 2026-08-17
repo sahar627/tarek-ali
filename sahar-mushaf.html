@@ -144,8 +144,11 @@ main{padding:14px 13px 30px;max-width:760px;margin-inline:auto}
 .cover h1{margin:0;font-size:2.5rem;font-weight:700;letter-spacing:.03em;line-height:1.5}
 /* الأقسام الثلاثة: بطاقات مؤطّرة بدل سطر باهت */
 .roles{display:flex;gap:6px;margin-top:14px}
-.roles span{flex:1;padding:9px 4px;border:1px solid var(--gold-line);border-radius:9px;
-  background:var(--gold-dim);color:var(--gold);font-size:1.02rem;font-weight:700;line-height:1.4}
+.roles a{flex:1;padding:10px 4px;border:1px solid var(--gold-line);border-radius:9px;
+  background:var(--gold-dim);color:var(--gold);font-size:1.02rem;font-weight:700;
+  line-height:1.4;display:block;transition:background .15s,border-color .15s}
+.roles a::after{content:"‹";display:block;font-size:.8rem;opacity:.55;line-height:1;margin-top:1px}
+.roles a:active{background:var(--gold);border-color:var(--gold);color:var(--bg)}
 .badges{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:13px}
 .badges span{font-family:system-ui,sans-serif;font-size:.8rem;font-weight:700;
   color:var(--bg);border:1px solid var(--accent);background:var(--accent);
@@ -898,7 +901,7 @@ async function viewHome() {
       <div class="mark"><i></i><u></u><b></b></div>
       <h1>سَحَر</h1>
       <p class="aya">وَبِٱلۡأَسۡحَارِ هُمۡ يَسۡتَغۡفِرُونَ</p>
-      <div class="roles"><span>المصحف الشريف</span><span>الأذكار</span><span>مواقيت الصلاة</span></div>
+      <div class="roles"><a href="#/mushaf">المصحف الشريف</a><a href="#/adhkar">الأذكار</a><a href="#/times">مواقيت الصلاة</a></div>
       <div class="badges"><span>بلا إعلانات</span><span>بلا إنترنت</span><span>بلا تتبّع</span></div>
     </section>
 
