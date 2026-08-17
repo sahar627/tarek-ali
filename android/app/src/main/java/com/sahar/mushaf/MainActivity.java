@@ -14,6 +14,7 @@ import org.json.JSONObject;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
+import android.os.PowerManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.ViewGroup;
@@ -89,6 +90,34 @@ public class MainActivity extends Activity {
             requestPermissions(new String[] { android.Manifest.permission.POST_NOTIFICATIONS }, 77);
         }
         Scheduler.scheduleNext(this);
+        askBatteryOnce();
+    }
+
+    /** يطلب استثناء البطارية مرة واحدة فقط، بنافذة «سماح / رفض» مباشرة */
+    private void askBatteryOnce() {
+        if (Build.VERSION.SDK_INT < 23) return;
+        if (Scheduler.prefs(this).getBoolean("battAsked", false)) return;
+        Scheduler.prefs(this).edit().putBoolean("battAsked", true).apply();
+        if (isBatteryFree()) return;
+        requestBattery();
+    }
+
+    private boolean isBatteryFree() {
+        if (Build.VERSION.SDK_INT < 23) return true;
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    /** نافذة النظام المباشرة: «السماح لهذا التطبيق بتجاهل تحسين البطارية؟» */
+    @SuppressLint("BatteryLife")
+    private void requestBattery() {
+        try {
+            startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            try { startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)); }
+            catch (Exception ignored) { }
+        }
     }
 
     /** الجسر بين واجهة الويب وجدولة المنبّه في النظام */
@@ -166,11 +195,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void openBatterySettings() {
-            try {
-                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
-            } catch (Exception ignored) { }
-        }
+        public void openBatterySettings() { requestBattery(); }
+
+        /** هل التطبيق مستثنى من تقييد البطارية؟ */
+        @JavascriptInterface
+        public boolean batteryFree() { return isBatteryFree(); }
     }
 
     /* زر الرجوع يتنقّل داخل التطبيق قبل أن يخرج منه */
