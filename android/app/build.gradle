@@ -12,33 +12,11 @@ android {
         versionName "2.0"
     }
 
-    /* مفتاح التوقيع: يُقرأ من متغيّرات البيئة إن وُجدت، وإلا يُستعمل مفتاح التطوير
-       حتى يخرج ملف APK قابل للتثبيت في كل الأحوال. */
-    signingConfigs {
-        release {
-            def ks = System.getenv("SAHAR_KEYSTORE")
-            if (ks != null && new File(ks).exists()) {
-                storeFile file(ks)
-                storePassword System.getenv("SAHAR_STORE_PASSWORD")
-                keyAlias System.getenv("SAHAR_KEY_ALIAS")
-                keyPassword System.getenv("SAHAR_KEY_PASSWORD")
-            }
-        }
-    }
-
     buildTypes {
         release {
             minifyEnabled false
-            def ks = System.getenv("SAHAR_KEYSTORE")
-            signingConfig (ks != null && new File(ks).exists())
-                ? signingConfigs.release : signingConfigs.debug
+            signingConfig signingConfigs.debug
         }
-    }
-
-    /* لا نُفشل البناء بسبب تنبيهات التدقيق — الشيفرة محروسة بفحوص إصدار في وقت التشغيل */
-    lintOptions {
-        abortOnError false
-        checkReleaseBuilds false
     }
 
     compileOptions {
