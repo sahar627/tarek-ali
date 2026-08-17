@@ -1221,7 +1221,9 @@ function viewTimes() {
           catch { return ''; } })()}</div>
         <div style="display:flex;gap:8px;margin-top:9px">
           <button class="row" id="permExact" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">إذن المنبّه الدقيق</button>
-          <button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>
+          ${(() => { try { return Sahar.batteryFree && Sahar.batteryFree() ? '' :
+            '<button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>'; }
+            catch { return '<button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>'; } })()}
         </div>`
         : `<p class="hint" style="margin-top:9px">التنبيه يعمل والتطبيق مفتوح. وللتنبيه والجهاز مغلق
         يلزم تطبيق أندرويد المبني من نفس المشروع.</p>`}
