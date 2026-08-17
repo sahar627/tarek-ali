@@ -8,14 +8,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android
     steps:
       - uses: actions/checkout@v4
 
-      - name: نسخ أحدث نسخة من التطبيق إلى داخل الحزمة
-        run: cp ../sahar-mushaf.html app/src/main/assets/index.html
+      - name: فحص تشخيصي — ماذا يوجد فعلاً
+        run: |
+          echo "=== جذر المستودع ==="
+          ls -la
+          echo "=== مجلد android ==="
+          ls -la android || echo "!! لا يوجد مجلد android"
+          echo "=== ملفات جافا ==="
+          find android -name "*.java" 2>/dev/null || true
+          echo "=== الأصول ==="
+          ls -la android/app/src/main/assets 2>/dev/null || echo "!! لا توجد assets"
+          echo "=== أدوات ==="
+          java -version 2>&1 || true
+          gradle --version 2>&1 | head -5 || echo "gradle غير مثبّت بعد"
 
       - name: تجهيز Java
         uses: actions/setup-java@v4
@@ -28,22 +36,33 @@ jobs:
 
       - name: تجهيز Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
-      - name: تجهيز مفتاح التوقيع (إن وُجد)
+      - name: تجهيز مفتاح التوقيع (اختياري)
         env:
           KS: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          if [ -n "$KS" ]; then
+          if [ -n "${KS:-}" ]; then
             echo "$KS" | base64 -d > "$RUNNER_TEMP/sahar.jks"
             echo "SAHAR_KEYSTORE=$RUNNER_TEMP/sahar.jks" >> "$GITHUB_ENV"
+            echo "مفتاح خاص جاهز"
+          else
+            echo "بلا مفتاح خاص — سيُستعمل مفتاح التطوير"
           fi
+          exit 0
 
       - name: البناء
+        working-directory: android
         env:
           SAHAR_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           SAHAR_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SAHAR_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle assembleRelease --no-daemon
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: أين الناتج
+        if: always()
+        run: find android -name "*.apk" 2>/dev/null || echo "لم يُنتج أي APK"
 
       - name: رفع الملف الناتج
         uses: actions/upload-artifact@v4
