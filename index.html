@@ -7,6 +7,7 @@
 <meta name="description" content="المصحف الشريف كاملاً، وأذكار الصباح والمساء وما بعد الصلاة، ومواقيت الصلاة. بلا إعلانات، بلا تتبّع، ويعمل بدون إنترنت.">
 <meta name="theme-color" content="#0A100E">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="القرآن والأذكار">
 <link rel="manifest" href="manifest.webmanifest">
@@ -832,17 +833,29 @@ function installHelp() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const android = /Android/.test(ua);
   const chrome = /Chrome\//.test(ua) && !/EdgA|OPR|SamsungBrowser|YaBrowser|MiuiBrowser/.test(ua);
+  /* على الآيفون: «إضافة إلى الشاشة الرئيسية» موجودة في Safari وحده.
+     كروم وفايرفوكس ومتصفحات واتساب وفيسبوك الداخلية لا تملكها. */
+  const iosOther = ios && /CriOS|FxiOS|EdgiOS|OPiOS|GSA\/|FBAN|FBAV|Instagram|Line\/|WhatsApp/.test(ua);
 
   let steps, note = '';
-  if (ios) {
-    steps = ['افتح هذه الصفحة بمتصفح <b>Safari</b>',
+  if (iosOther) {
+    note = 'على الآيفون، خيار الإضافة للشاشة الرئيسية موجود في متصفح Safari وحده. ' +
+           'المتصفح الذي تستعمله الآن لا يملكه — وهذا قيد من آبل لا نقص في التطبيق.';
+    steps = ['انسخ رابط الصفحة بالزر أدناه',
+             'افتح تطبيق <b>Safari</b> والصق الرابط',
              'اضغط زر المشاركة <b>⬆</b> في أسفل الشاشة',
-             'اختر <b>«إضافة إلى الشاشة الرئيسية»</b>'];
+             'مرّر لأسفل واختر <b>«إضافة إلى الشاشة الرئيسية»</b>'];
+  } else if (ios) {
+    note = 'إن لم تجد الخيار فتأكد أنك في متصفح Safari، لا في متصفح آخر ولا داخل واتساب.';
+    steps = ['اضغط زر المشاركة <b>⬆</b> في أسفل شاشة Safari',
+             'مرّر لأسفل في القائمة',
+             'اختر <b>«إضافة إلى الشاشة الرئيسية»</b>',
+             'ثم <b>«إضافة»</b> في الأعلى'];
   } else if (android && !chrome) {
-    steps = ['انسخ رابط الصفحة',
+    note = 'متصفحك الحالي لا يدعم تثبيت التطبيقات. Chrome يدعمه.';
+    steps = ['انسخ رابط الصفحة بالزر أدناه',
              'افتحه بمتصفح <b>Chrome</b>',
              'سيظهر زر التثبيت مباشرة'];
-    note = 'متصفحك الحالي لا يدعم تثبيت التطبيقات. Chrome يدعمه.';
   } else if (android) {
     steps = ['اضغط <b>⋮</b> في أعلى المتصفح',
              'اختر <b>«إضافة إلى الشاشة الرئيسية»</b>',
@@ -851,11 +864,20 @@ function installHelp() {
     steps = ['اضغط أيقونة التثبيت <b>⊕</b> في شريط العنوان',
              'أو اختر <b>«تثبيت»</b> من قائمة المتصفح'];
   }
+
   openSheet(`
     <h3>تثبيت التطبيق</h3>
     ${note ? `<p class="hint" style="margin:0 0 10px">${note}</p>` : ''}
     <ol class="isteps">${steps.map(t => '<li>' + t + '</li>').join('')}</ol>
-    <div class="sheet-actions"><button data-close>حسناً</button></div>`);
+    <div class="sheet-actions">
+      <button id="copyUrl">نسخ رابط الصفحة</button>
+      <button data-close>حسناً</button>
+    </div>`);
+  const cu = $('#copyUrl');
+  if (cu) cu.onclick = async () => {
+    try { await navigator.clipboard.writeText(location.href.split('#')[0]); cu.textContent = 'تم النسخ ✓'; }
+    catch { cu.textContent = location.href.split('#')[0]; }
+  };
 }
 
 async function doInstall() {
