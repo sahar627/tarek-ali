@@ -411,6 +411,32 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 /* ===== تقليب الصفحة ===== */
 .mushaf{will-change:transform,opacity;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 
+/* ===== ترويسة الصفحة ===== */
+.phead{padding:12px 14px 11px;margin-bottom:10px;background:var(--surface);
+  border:2px solid var(--gold-line);border-radius:14px;transition:box-shadow .3s,border-color .3s}
+.phead.pulse{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-dim)}
+.ph-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ph-juz{font-family:system-ui,sans-serif;font-size:.86rem;font-weight:700;color:var(--ink);
+  opacity:.8;border:1px solid var(--line);border-radius:8px;padding:5px 11px}
+.ph-no{display:flex;align-items:baseline;gap:6px;color:var(--gold)}
+.ph-no b{font-family:system-ui,sans-serif;font-size:1.75rem;font-weight:800;
+  font-variant-numeric:tabular-nums;line-height:1}
+.ph-no small{font-family:system-ui,sans-serif;font-size:.78rem;opacity:.8}
+.ph-sura{margin-top:8px;font-size:1.28rem;font-weight:700;line-height:1.5}
+.phead .progress{margin-top:9px}
+.ph-foot{margin-top:6px;font-family:system-ui,sans-serif;font-size:.76rem;
+  color:var(--ink);opacity:.65}
+
+/* ===== وميض رقم الصفحة عند الانتقال ===== */
+.pflash{position:fixed;inset:0;z-index:45;display:grid;place-items:center;
+  pointer-events:none;opacity:0;transition:opacity .25s}
+.pflash.go{opacity:1}
+.pflash b{display:block;font-family:system-ui,sans-serif;font-size:5.5rem;font-weight:800;
+  color:var(--gold);text-align:center;line-height:1;font-variant-numeric:tabular-nums;
+  text-shadow:0 6px 30px rgba(0,0,0,.55)}
+.pflash span{display:block;text-align:center;font-family:system-ui,sans-serif;
+  font-size:1rem;color:var(--gold);opacity:.85;margin-top:6px}
+
 </style>
 </head>
 <body>
@@ -2018,6 +2044,19 @@ function search(raw, list, q) {
 }
 
 
+
+/* رقم الصفحة يظهر كبيراً لحظة الانتقال ثم يذوب */
+function pageFlash(p) {
+  const old = document.getElementById('pflash');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'pflash'; el.className = 'pflash';
+  el.innerHTML = `<b>${AR(p)}</b><span>الصفحة</span>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('go'));
+  setTimeout(() => { el.classList.remove('go'); setTimeout(() => el.remove(), 300); }, 850);
+}
+
 /* ================= تقليب الصفحات بالسحب =================
    نستعمل أحداث المؤشّر مع «أسر المؤشّر»، فيصلنا رفعُ الإصبع مهما خرج عن حدود الصفحة. */
 let swipeOff = null;
@@ -2169,7 +2208,17 @@ function renderPage(q, p, focusIdx) {
   setBar('صفحة ' + AR(p), names.join(' · ') + ' · الجزء ' + AR(juz), '#/mushaf');
   setTab('mushaf');
 
+  const pct = Math.round(p / pageCount(q) * 100);
   view.innerHTML = `
+    <div class="phead" id="phead">
+      <div class="ph-top">
+        <span class="ph-juz">الجزء ${AR(juz)}</span>
+        <span class="ph-no"><b>${AR(p)}</b><small>الصفحة</small></span>
+      </div>
+      <div class="ph-sura">${names.map(n => 'سورة ' + esc(n)).join(' · ')}</div>
+      <span class="progress"><i style="width:${pct}%"></i></span>
+      <div class="ph-foot">${AR(p)} من ${AR(pageCount(q))} · ${AR(pct)}٪ من المصحف</div>
+    </div>
     ${sizerHTML()}
     <div class="mushaf" id="mushaf">${body}</div>
     <div class="pager">
@@ -2182,7 +2231,14 @@ function renderPage(q, p, focusIdx) {
   if (prefs.awake !== false) keepAwake(true);
 
   const sheetEl = $('#mushaf');
-  if (flipDir) { flipIn(sheetEl, flipDir); flipDir = 0; }
+  if (flipDir) {
+    flipIn(sheetEl, flipDir);
+    pageFlash(p);
+    const ph = $('#phead');
+    if (ph) { ph.classList.add('pulse'); setTimeout(() => ph.classList.remove('pulse'), 700); }
+    if (navigator.vibrate) navigator.vibrate(15);
+    flipDir = 0;
+  }
   bindSwipe(sheetEl,
     () => { if (p < pageCount(q)) { flipDir = 1; location.hash = '#/p/' + (p + 1); } },
     () => { if (p > 1) { flipDir = -1; location.hash = '#/p/' + (p - 1); } });
