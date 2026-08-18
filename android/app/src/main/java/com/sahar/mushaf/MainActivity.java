@@ -200,6 +200,26 @@ public class MainActivity extends Activity {
         /** هل التطبيق مستثنى من تقييد البطارية؟ */
         @JavascriptInterface
         public boolean batteryFree() { return isBatteryFree(); }
+
+        /** تقرير حالة التنبيه: هل جُدول؟ ومتى؟ وما الأذونات؟ */
+        @JavascriptInterface
+        public String status() {
+            android.content.SharedPreferences p = Scheduler.prefs(MainActivity.this);
+            boolean notif = true;
+            if (Build.VERSION.SDK_INT >= 33)
+                notif = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        == PackageManager.PERMISSION_GRANTED;
+            return "{\"nextAt\":" + p.getLong("nextAt", 0)
+                 + ",\"nextKey\":\"" + p.getString("nextKey", "") + "\""
+                 + ",\"nextPre\":" + p.getBoolean("nextPre", false)
+                 + ",\"exact\":" + exactAllowed()
+                 + ",\"battery\":" + isBatteryFree()
+                 + ",\"notif\":" + notif + "}";
+        }
+
+        /** يضبط منبّهاً بعد دقيقة لاختبار المنظومة كلها */
+        @JavascriptInterface
+        public void testAlarm() { Scheduler.test(MainActivity.this, 60); }
     }
 
     /* زر الرجوع يتنقّل داخل التطبيق قبل أن يخرج منه */
