@@ -325,6 +325,19 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .qread span{display:block;font-family:system-ui,sans-serif;font-size:.84rem;
   color:var(--ink);opacity:.8;margin-top:2px}
 
+/* ===== التلاوة ===== */
+.ayah.is-playing{background:var(--accent);color:var(--bg);box-shadow:0 0 0 2px var(--accent)}
+.ayah.is-playing .num{border-color:var(--bg);color:var(--bg);background:transparent}
+.playbar{position:fixed;inset-inline:12px;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 10px);
+  z-index:35;display:flex;align-items:center;gap:12px;padding:10px 14px;
+  background:var(--surface);border:2px solid var(--accent);border-radius:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:740px;margin-inline:auto}
+.playbar span{flex:1;text-align:center;font-family:system-ui,sans-serif;font-size:.95rem;
+  font-weight:700;color:var(--accent)}
+.playbar button{width:40px;height:40px;border-radius:10px;border:1px solid var(--frame);
+  background:var(--surface2);font-size:1rem;color:var(--ink)}
+.playbar button:active{background:var(--accent-dim)}
+
 </style>
 </head>
 <body>
@@ -770,42 +783,70 @@ function banner(title, body) {
 }
 function markFired(k) { fired.v[k] = 1; fired.d = today(); store.set('fired', fired); }
 
-function checkPrayers() {
-  if (!prefs.alert) return;
-  const now = new Date();
-  const h = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-  const { t } = todayTimes(now);
-  for (const [k, name] of PRAYERS) {
-    if (k === 'sunrise' || isNaN(t[k])) continue;
-    const diff = (t[k] - h) * 60;                     /* بالدقائق */
+/* يحوّل ساعة عشرية إلى وقت مطلق بالمللي ثانية */
+function atMillis(date, hours) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime() + Math.round(hours * 3600000);
+}
 
-    if (prefs.before > 0 && diff <= prefs.before && diff > prefs.before - 1.2
-        && !fired.v['b' + k]) {
-      markFired('b' + k);
+/* يبني قائمة أحداث اليوم والغد: تنبيه مسبق ودخول وقت */
+function eventList() {
+  const out = [];
+  for (let off = 0; off <= 1; off++) {
+    const day = new Date(Date.now() + off * 864e5);
+    const { t } = todayTimes(day);
+    for (const [k, name] of PRAYERS) {
+      if (k === 'sunrise' || isNaN(t[k])) continue;
+      const at = atMillis(day, t[k]);
+      const tag = day.toISOString().slice(0, 10) + ':' + k;
+      if (prefs.before > 0)
+        out.push({ at: at - prefs.before * 60000, k, name, pre: true, id: 'b' + tag });
+      out.push({ at, k, name, pre: false, id: 'a' + tag });
+    }
+  }
+  return out.sort((x, y) => x.at - y.at);
+}
+
+/* الفحص يمسح المدة المنقضية منذ آخر مرة، فلا يفوته حدث لو جمّد المتصفح الصفحة */
+let lastCheck = Date.now();
+function checkPrayers() {
+  const now = Date.now();
+  const from = lastCheck;
+  lastCheck = now;
+  if (!prefs.alert) return;
+  if (now - from > 3600000) return;      /* غياب طويل: لا نُطلق تنبيهات فائتة */
+
+  for (const e of eventList()) {
+    if (e.at <= from || e.at > now) continue;
+    if (fired.v[e.id]) continue;
+    fired.v[e.id] = 1; fired.d = today(); store.set('fired', fired);
+
+    if (e.pre) {
+      const msg = `اقترب وقت صلاة ${e.name} — بعد ${AR(prefs.before)} دقيقة`;
       if (!NATIVE) {
         snd.alert(true);
         if (prefs.vib && navigator.vibrate) navigator.vibrate([120, 80, 120]);
       }
-      const msg = `اقترب وقت صلاة ${name} — بعد ${AR(Math.round(diff))} دقيقة`;
       banner('تنبيه قبل الأذان', msg);
-      notify('سَحَر', msg);
-    }
-    if (diff <= 0 && diff > -1.2 && !fired.v['a' + k]) {
-      markFired('a' + k);
-      if (!NATIVE) {          /* في التطبيق يتولّى النظامُ الصوتَ والاهتزاز */
-        const ck = (k === 'fajr' && prefs.chimeFajr && prefs.chimeFajr !== 'same')
+      notify('اقترب وقت الصلاة', msg);
+    } else {
+      const msg = `حان الآن وقت صلاة ${e.name} بتوقيت ${currentCity().n}`;
+      if (!NATIVE) {
+        const ck = (e.k === 'fajr' && prefs.chimeFajr && prefs.chimeFajr !== 'same')
           ? prefs.chimeFajr : prefs.chime;
         if (ck === 'soft') snd.alert(true);
         else if (ck !== 'none') snd.athan(true, ck);
-        if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB[k] || [400]);
+        if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB[e.k] || [400]);
       }
-      const msg = `حان الآن وقت صلاة ${name} بتوقيت ${currentCity().n}`;
       banner('دخل وقت الصلاة', msg);
-      notify('سَحَر', msg);
+      notify('دخل وقت الصلاة', msg);
     }
   }
 }
-setInterval(checkPrayers, 20000);
+setInterval(checkPrayers, 15000);
+/* عند العودة إلى الصفحة نلحق ما فات أثناء التجميد */
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkPrayers(); });
 
 /* ---------- البيانات ---------- */
 let QURAN = null, ADHKAR = null;
@@ -825,6 +866,92 @@ const strip = s => s
   .replace(/[\u00A0\s]+/g, ' ').trim();
 let INDEX = null;
 const index = q => INDEX || (INDEX = q.text.map(s => s.map(strip)));
+
+
+/* ================= تلاوة الآيات =================
+   المصدر يُضبط في ملف recite.json بجوار التطبيق. مثاله:
+   { "default": "x", "items": [ { "id":"x", "name":"القارئ", "url":"audio/quran/{s3}{a3}.mp3",
+     "by":"المصدر: … — الرخصة: …" } ] }
+   {s3} و{a3} = رقم السورة والآية بثلاث خانات. يقبل مساراً محلياً أو رابطاً. */
+let RECITE = [];
+if (window.fetch && location.protocol.startsWith('http')) {
+  try {
+    fetch('recite.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (j && Array.isArray(j.items) && j.items.length) {
+          RECITE = j.items;
+          if (!prefs.reciter) { prefs.reciter = j.default || j.items[0].id; store.set('prefs', prefs); }
+        }
+      })
+      .catch(() => {});
+  } catch {}
+}
+const pad3 = n => String(n).padStart(3, '0');
+const reciterById = id => RECITE.find(x => x.id === id) || RECITE[0];
+function ayahUrl(si, ai) {
+  const r = reciterById(prefs.reciter);
+  if (!r) return null;
+  return r.url.replace('{s3}', pad3(si)).replace('{a3}', pad3(ai))
+              .replace('{s}', si).replace('{a}', ai);
+}
+
+/* مشغّل متتابع: يقرأ من الآية المختارة إلى آخر السورة */
+const player = {
+  audio: null, si: 0, ai: 0, max: 0, on: false,
+  start(si, ai, max) {
+    this.stop();
+    this.si = si; this.ai = ai; this.max = max; this.on = true;
+    this.bar(); this.play();
+  },
+  play() {
+    if (!this.on) return;
+    const url = ayahUrl(this.si, this.ai);
+    if (!url) return this.stop();
+    try {
+      this.audio = new Audio(url);
+      this.audio.volume = 1;
+      this.audio.onended = () => { this.ai++; (this.ai <= this.max) ? this.play() : this.stop(); };
+      this.audio.onerror = () => this.fail();
+      this.audio.play().catch(() => this.fail());
+    } catch { this.fail(); }
+    this.mark();
+  },
+  fail() {
+    this.stop();
+    banner('تعذّر تشغيل التلاوة', navigator.onLine === false
+      ? 'التلاوة تحتاج اتصالاً بالإنترنت'
+      : 'لم يصل الملف الصوتي لهذه الآية');
+  },
+  mark() {
+    document.querySelectorAll('.ayah.is-playing').forEach(x => x.classList.remove('is-playing'));
+    const el = $('#a' + this.ai);
+    if (el) { el.classList.add('is-playing'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    const lbl = $('#pbAyah'); if (lbl) lbl.textContent = 'الآية ' + AR(this.ai);
+  },
+  pause() {
+    if (!this.audio) return;
+    if (this.audio.paused) { this.audio.play().catch(() => {}); $('#pbTog').textContent = '❚❚'; }
+    else { this.audio.pause(); $('#pbTog').textContent = '▶'; }
+  },
+  stop() {
+    this.on = false;
+    if (this.audio) { try { this.audio.pause(); } catch {} this.audio = null; }
+    document.querySelectorAll('.ayah.is-playing').forEach(x => x.classList.remove('is-playing'));
+    const b = $('#playbar'); if (b) b.remove();
+  },
+  bar() {
+    if ($('#playbar')) return;
+    const el = document.createElement('div');
+    el.id = 'playbar'; el.className = 'playbar';
+    el.innerHTML = `<button id="pbTog" aria-label="إيقاف مؤقت">❚❚</button>
+      <span id="pbAyah">…</span>
+      <button id="pbStop" aria-label="إنهاء">✕</button>`;
+    document.body.appendChild(el);
+    $('#pbTog').onclick = () => this.pause();
+    $('#pbStop').onclick = () => this.stop();
+  }
+};
 
 /* ---------- اللوحة المنبثقة والشريط ---------- */
 const view = $('#view'), sheet = $('#sheet'), backdrop = $('#backdrop');
@@ -1223,8 +1350,11 @@ function viewTimes() {
             '<button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>'; }
             catch { return '<button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>'; } })()}
         </div>`
-        : `<p class="hint" style="margin-top:9px">التنبيه يعمل والتطبيق مفتوح. وللتنبيه والجهاز مغلق
-        يلزم تطبيق أندرويد المبني من نفس المشروع.</p>`}
+        : `<div class="notice"><b>التنبيه يعمل ما دام التطبيق مفتوحاً.</b><br>
+        المتصفح يوقف الصفحة عند إغلاقها فلا يستطيع تنبيهك حينها.
+        ${(() => { try { return (window.Notification && Notification.permission === 'granted')
+            ? '' : '<br><br>اسمح بالإشعارات ليصلك التنبيه وأنت في تطبيق آخر.'; }
+          catch { return ''; } })()}</div>`}
       ${ATHAN.length ? '' : `<div class="notice"><b>لإضافة أذان بصوت حقيقي:</b><br>
         ضع ملف <b>athan.json</b> وملفاتك الصوتية بجوار ملفات التطبيق، فتظهر هنا تلقائياً.
         النغمة الحالية نغمة إعلان لا تكبيراً بصوت بشري.</div>`}
@@ -1252,7 +1382,13 @@ function viewTimes() {
         prefs[key] = cast(b.dataset.v); store.set('prefs', prefs); syncNative(); snd.tick(); render();
       };
     };
-    pick('al', 'alert', v => v === '1');
+    pick('al', 'alert', v => {
+      const on = v === '1';
+      if (on && window.Notification && Notification.permission === 'default') {
+        try { Notification.requestPermission(); } catch {}
+      }
+      return on;
+    });
     pick('bf', 'before', v => +v);
     pick('ch', 'chime', v => { prefs.chimeSet = 1; return v; });
     pick('chf', 'chimeFajr', v => { prefs.chimeSet = 1; return v; });
@@ -1390,10 +1526,14 @@ async function viewSurah(si, ai) {
       <h3>${esc(s.n)} — الآية ${AR(no)}</h3>
       <p style="font-family:'AmiriQuran',serif;font-size:1.22rem;line-height:2.15;margin:0">${esc(txt)}</p>
       <div class="sheet-actions">
+        ${RECITE.length ? `<button id="ls"><b>استماع من هذه الآية</b>
+          <span class="hint" style="display:block">${esc(reciterById(prefs.reciter)?.name || '')}</span></button>` : ''}
         <button id="cp">نسخ الآية</button>
         <button id="mk">${isMarked ? 'إزالة العلامة' : 'حفظ علامة عند هذه الآية'}</button>
         <button data-close>إغلاق</button>
       </div>`);
+    const lsb = $('#ls');
+    if (lsb) lsb.onclick = () => { closeSheet(); player.start(si, no, s.c); };
     $('#cp').onclick = async () => {
       try { await navigator.clipboard.writeText(`${txt}\n[${s.n}: ${no}]`); $('#cp').textContent = 'تم النسخ ✓'; }
       catch { $('#cp').textContent = 'تعذّر النسخ'; }
@@ -1500,6 +1640,10 @@ function viewSettings() {
         <input id="fs" type="range" min="1.15" max="2.4" step="0.05" value="${prefs.q}"></div>
       <div class="set-row"><label for="lh">تباعد الأسطر</label>
         <input id="lh" type="range" min="1.9" max="3.2" step="0.05" value="${prefs.lh}"></div>
+      ${RECITE.length > 1 ? `<div class="set-row"><label for="rec">القارئ</label>
+        <select class="field" id="rec" style="width:auto;min-width:170px">
+          ${RECITE.map(r => `<option value="${esc(r.id)}"${prefs.reciter === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}
+        </select></div>` : ''}
       <div class="set-row"><label>أصوات الواجهة</label>
         <div class="chips" id="sd">
           <button class="chip" data-s="1" aria-pressed="${prefs.snd !== false}">تشغيل</button>
@@ -1546,6 +1690,8 @@ function viewSettings() {
     if (prefs.snd) snd.page();
     viewSettings();
   };
+  const rs = $('#rec');
+  if (rs) rs.onchange = e => { prefs.reciter = e.target.value; store.set('prefs', prefs); };
   $('#fs').oninput = e => { prefs.q = +e.target.value; store.set('prefs', prefs); applyType(); };
   $('#lh').oninput = e => { prefs.lh = +e.target.value; store.set('prefs', prefs); applyType(); };
   const ib2 = $('#install'); if (ib2) ib2.onclick = doInstall;
@@ -1576,7 +1722,7 @@ paintThemeBtn();
 /* ---------- التوجيه ---------- */
 let booted = false;
 function route() {
-  closeSheet(); stopTicker(); stopCompass();
+  closeSheet(); stopTicker(); stopCompass(); player.stop();
   const p = (location.hash || '#/home').slice(2).split('/');
   if (booted) { p[0] === 's' ? snd.page() : snd.open(); }
   booted = true;

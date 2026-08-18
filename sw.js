@@ -2,7 +2,7 @@
 const V = 'sahar-flat-v10';
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable.png', './icon-180.png', './og.png',
-  './athan.json', './takbir.mp3', './makkah.mp3', './madinah.mp3',
+  './athan.json', './recite.json', './takbir.mp3', './makkah.mp3', './madinah.mp3',
   './madinah-fajr.mp3', './rifaat.mp3'];
 
 self.addEventListener('install', e => {
