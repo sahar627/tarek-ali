@@ -338,6 +338,16 @@ input[type=range]{width:145px;accent-color:var(--accent)}
   background:var(--surface2);font-size:1rem;color:var(--ink)}
 .playbar button:active{background:var(--accent-dim)}
 
+/* ===== فحص التنبيه ===== */
+.chk{display:flex;align-items:center;gap:9px;padding:8px 4px;font-family:system-ui,sans-serif;
+  font-size:.86rem;border-bottom:1px solid var(--line)}
+.chk:last-child{border-bottom:0}
+.chk span{width:24px;height:24px;flex:none;display:grid;place-items:center;border-radius:50%;
+  font-weight:700;font-size:.8rem}
+.chk.ok span{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-line)}
+.chk.no span{background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-line)}
+.chk b{font-weight:600}
+
 </style>
 </head>
 <body>
@@ -1079,6 +1089,17 @@ function kaabaDistance(lat, lng) {
             Math.cos(rad(lat)) * Math.cos(rad(KAABA.lat)) * Math.sin(q / 2) ** 2;
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+/* الحالة الفعلية لإذن الإشعارات، تُقرأ في كل مرة لا تُخزَّن */
+function notifState() {
+  try {
+    if (!window.Notification) return 'none';
+    return Notification.permission;          /* granted | denied | default */
+  } catch { return 'none'; }
+}
+const Scheduler_name = k => {
+  const f = PRAYERS.find(x => x[0] === k);
+  return f ? f[1] : (k === 'test' ? 'اختبار' : k || '—');
+};
 const dirName = b => ['شمالاً', 'شمالاً شرقياً', 'شرقاً', 'جنوباً شرقياً', 'جنوباً',
   'جنوباً غربياً', 'غرباً', 'شمالاً غربياً'][Math.round(b / 45) % 8];
 
@@ -1335,10 +1356,43 @@ function viewTimes() {
             <button class="chip" data-v="0" aria-pressed="${prefs.vib === false}">إيقاف</button>
           </div></div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:9px">
-        <button class="row" id="try" style="flex:1;justify-content:center;font-family:system-ui;font-size:.85rem">تجربة النغمة</button>
-        <button class="row" id="perm" style="flex:1;justify-content:center;font-family:system-ui;font-size:.85rem">تفعيل الإشعارات</button>
-      </div>
+      ${(() => {
+        const ns = notifState();
+        const row = ns === 'granted'
+          ? `<div class="chk ok"><span>✓</span><b>الإشعارات مفعّلة</b></div>`
+          : ns === 'denied'
+          ? `<div class="chk no"><span>✕</span><b>الإشعارات ممنوعة — فعّلها من إعدادات المتصفح لهذا الموقع</b></div>`
+          : ns === 'none'
+          ? `<div class="chk no"><span>✕</span><b>متصفحك لا يدعم الإشعارات</b></div>`
+          : `<div class="chk no"><span>✕</span><b>الإشعارات غير مفعّلة</b></div>`;
+        return `<div class="card" style="padding:10px 12px;margin-top:9px">${row}</div>
+          ${ns === 'default' ? `<button class="row" id="perm"
+            style="justify-content:center;margin-top:8px;font-family:system-ui;font-size:.86rem">تفعيل الإشعارات</button>` : ''}`;
+      })()}
+      <button class="row" id="try" style="justify-content:center;margin-top:8px;font-family:system-ui;font-size:.86rem">تجربة النغمة</button>
+      ${NATIVE ? (() => {
+        let st = null;
+        try { st = JSON.parse(Sahar.status()); } catch {}
+        if (!st) return '';
+        const when = st.nextAt ? new Date(st.nextAt) : null;
+        const hh = when ? AR(String(when.getHours()).padStart(2, '0')) + ':' +
+                          AR(String(when.getMinutes()).padStart(2, '0')) : '—';
+        const row = (ok, t) => `<div class="chk ${ok ? 'ok' : 'no'}">
+          <span>${ok ? '✓' : '✕'}</span><b>${t}</b></div>`;
+        return `<div class="section-title">فحص التنبيه</div>
+          <div class="card" style="padding:12px">
+            <div class="chk ${st.nextAt ? 'ok' : 'no'}"><span>${st.nextAt ? '✓' : '✕'}</span>
+              <b>${st.nextAt ? 'التنبيه القادم: ' + esc(Scheduler_name(st.nextKey)) + ' الساعة ' + hh +
+                 (st.nextPre ? ' (تنبيه مسبق)' : '') : 'لم يُجدول أي تنبيه'}</b></div>
+            ${row(st.notif, 'إذن الإشعارات')}
+            ${row(st.exact, 'إذن المنبّه الدقيق')}
+            ${row(st.battery, 'استثناء من توفير البطارية')}
+          </div>
+          <button class="row" id="testAlarm" style="justify-content:center;margin-top:9px;font-family:system-ui;font-size:.88rem">
+            اختبار التنبيه بعد دقيقة</button>
+          <p class="hint" style="margin-top:7px">اضغط الزر، ثم <b>أغلق التطبيق تماماً</b> واقفل الشاشة.
+            إن وصلك الإشعار وسمعت التكبيرات بعد دقيقة، فالمنظومة تعمل.</p>`;
+      })() : ''}
       ${NATIVE ? `<div class="notice"><b>الأذان يعمل والتطبيق مغلق.</b><br>
         النظام يوقظ الجهاز في وقت كل صلاة فيؤذّن، بلا إنترنت وبلا خوادم.
         ${(() => { try { return Sahar.exactAllowed() ? '' :
@@ -1350,11 +1404,7 @@ function viewTimes() {
             '<button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>'; }
             catch { return '<button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>'; } })()}
         </div>`
-        : `<div class="notice"><b>التنبيه يعمل ما دام التطبيق مفتوحاً.</b><br>
-        المتصفح يوقف الصفحة عند إغلاقها فلا يستطيع تنبيهك حينها.
-        ${(() => { try { return (window.Notification && Notification.permission === 'granted')
-            ? '' : '<br><br>اسمح بالإشعارات ليصلك التنبيه وأنت في تطبيق آخر.'; }
-          catch { return ''; } })()}</div>`}
+        : ''}
       ${ATHAN.length ? '' : `<div class="notice"><b>لإضافة أذان بصوت حقيقي:</b><br>
         ضع ملف <b>athan.json</b> وملفاتك الصوتية بجوار ملفات التطبيق، فتظهر هنا تلقائياً.
         النغمة الحالية نغمة إعلان لا تكبيراً بصوت بشري.</div>`}
@@ -1405,12 +1455,16 @@ function viewTimes() {
       if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB.maghrib);
       banner('تجربة', 'هكذا سيصلك التنبيه عند دخول وقت الصلاة');
     };
-    $('#perm').onclick = async () => {
-      if (!window.Notification) { alert('الإشعارات غير مدعومة في هذا المتصفح.'); return; }
-      const r = await Notification.requestPermission();
-      $('#perm').textContent = r === 'granted' ? 'الإشعارات مفعّلة ✓' : 'لم يُسمح بالإشعارات';
+    const pm = $('#perm');
+    if (pm) pm.onclick = async () => {
+      try { await Notification.requestPermission(); } catch {}
+      render();                       /* نعيد الرسم فتظهر الحالة الحقيقية */
     };
 
+    const ta = $('#testAlarm');
+    if (ta) ta.onclick = () => {
+      try { Sahar.testAlarm(); ta.textContent = 'ضُبط التنبيه — أغلق التطبيق الآن'; } catch {}
+    };
     const pe = $('#permExact'); if (pe) pe.onclick = () => { try { Sahar.openExactSettings(); } catch {} };
     const pb = $('#permBatt'); if (pb) pb.onclick = () => { try { Sahar.openBatterySettings(); } catch {} };
 
@@ -1701,7 +1755,7 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPromp
 addEventListener('appinstalled', () => {
   deferredPrompt = null;
   const b = $('#installNow'); if (b) b.remove();
-  banner('تم التثبيت', 'ستجد أيقونة «سَحَر» مع بقية تطبيقاتك');
+  banner('تم التثبيت', 'ستجد أيقونة «القرآن والأذكار» مع بقية تطبيقاتك');
 });
 
 $('#settingsBtn').onclick = () => { location.hash = '#/settings'; };
@@ -1739,8 +1793,25 @@ addEventListener('hashchange', route);
 route();
 syncNative();
 
+/* التحديث التلقائي: يفحص وجود نسخة جديدة ويطبّقها بلا حذف ولا إعادة تثبيت */
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+      const check = () => { try { reg.update(); } catch {} };
+      check();
+      setInterval(check, 15 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      addEventListener('online', check);
+
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloaded) return;
+        reloaded = true;
+        location.reload();
+      });
+    } catch {}
+  });
 }
 })();
 
