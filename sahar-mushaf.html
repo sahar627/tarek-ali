@@ -1473,7 +1473,8 @@ function openShare() {
 
 
 /* لوحة تشرح نسخة أندرويد قبل أي تنزيل — بلا مفاجأة ولا لبس */
-const APK_URL = 'quran-adhkar.apk';   /* من نفس نطاق الموقع — أسرع وأضمن */
+const APK_URL = 'quran-adhkar.apk';        /* من نفس نطاق الموقع — أسرع */
+const APK_FALLBACK = 'https://github.com/sahar627/tarek-ali/releases/latest/download/quran-adhkar.apk';
 function openAthanInfo() {
   openSheet(`
     <h3>لتشغيل الأذان والجهاز مغلق</h3>
@@ -1494,6 +1495,13 @@ function openAthanInfo() {
         style="text-decoration:none;margin-top:4px"><span>متابعة — ٣ ميجابايت</span></a>
       <button data-close>ليس الآن</button>
     </div>`);
+  /* إن لم يكن الملف على الموقع بعد، نحوّل الرابط إلى النسخة المنشورة */
+  const go = $('#apkGo');
+  if (go && window.fetch) {
+    fetch(APK_URL, { method: 'HEAD' })
+      .then(r => { if (!r.ok) go.href = APK_FALLBACK; })
+      .catch(() => { go.href = APK_FALLBACK; });
+  }
 }
 
 /* ================= الرئيسية (الغلاف) ================= */
