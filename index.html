@@ -375,6 +375,13 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .tafsir{padding:12px 13px;border:1px solid var(--line);border-radius:10px;
   background:var(--surface2);font-size:1.05rem;line-height:2}
 
+/* ===== زر تنزيل تطبيق أندرويد ===== */
+.apkbtn{width:100%;margin-top:11px;padding:15px;display:flex;align-items:center;
+  justify-content:center;gap:10px;border-radius:var(--r);background:var(--surface);
+  border:2px solid var(--gold-line);color:var(--gold);font-size:1.05rem;font-weight:700}
+.apkbtn svg{width:22px;height:22px}
+.apkbtn:active{background:var(--gold-dim)}
+
 </style>
 </head>
 <body>
@@ -1431,6 +1438,12 @@ async function viewHome() {
       <div><b>متابعة القراءة</b><small>سورة ${esc(q.surahs[last.s - 1].n)} — الآية ${AR(last.a)}</small></div>
       <span class="arrow">‹</span></a>` : ''}
 
+    ${(() => {
+      const android = /Android/.test(navigator.userAgent);
+      if (NATIVE || !android || location.protocol === 'file:') return '';
+      return `<a class="apkbtn" href="https://github.com/sahar627/tarek-ali/releases/latest/download/quran-adhkar.apk">
+        ${svg('down')}<span>حمّل تطبيق أندرويد — ليؤذّن والجهاز مغلق</span></a>`;
+    })()}
     <button class="sharebtn" id="shareBtn">
       ${svg('share')}<span>شارك التطبيق</span>
     </button>
