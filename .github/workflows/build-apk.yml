@@ -97,6 +97,19 @@ jobs:
             -t "القرآن والأذكار — آخر إصدار" \
             -n "تطبيق أندرويد: المصحف والأذكار ومواقيت الصلاة والأذان في وقته. بلا إعلانات وبلا إنترنت."
 
+      # يضع نسخة من التطبيق داخل الموقع نفسه، فيُنزَّل من نفس النطاق الذي يفتحه المستخدم
+      - name: نسخ التطبيق إلى الموقع
+        run: |
+          set -e
+          APK=$(find android -name "*.apk" | head -1)
+          cp "$APK" quran-adhkar.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f quran-adhkar.apk
+          git commit -m "تحديث تطبيق أندرويد" || echo "لا جديد"
+          git pull --rebase --autostash || true
+          git push
+
       - name: رفع الملف الناتج
         uses: actions/upload-artifact@v4
         with:
