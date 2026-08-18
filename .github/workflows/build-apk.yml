@@ -8,11 +8,18 @@ on:
 permissions:
   contents: write
 
+# بناء واحد في كل مرة؛ الأحدث يلغي ما قبله فلا تتزاحم عمليات الدفع
+concurrency:
+  group: apk-build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: فحص تشخيصي — ماذا يوجد فعلاً
         run: |
@@ -106,9 +113,24 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -f quran-adhkar.apk
-          git commit -m "تحديث تطبيق أندرويد" || echo "لا جديد"
-          git pull --rebase --autostash || true
-          git push
+          if git diff --cached --quiet; then
+            echo "لا جديد في ملف التطبيق"
+            exit 0
+          fi
+          git commit -m "تحديث تطبيق أندرويد [skip ci]"
+          # الفرع قد يتحرّك أثناء البناء، فنعيد المحاولة بدل أن نفشل
+          for i in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort || true; }
+            if git push origin HEAD:main; then
+              echo "تم الدفع في المحاولة $i"
+              exit 0
+            fi
+            echo "المحاولة $i لم تنجح — إعادة بعد قليل"
+            sleep $((i * 6))
+          done
+          echo "تعذّر الدفع بعد خمس محاولات"
+          exit 1
 
       - name: رفع الملف الناتج
         uses: actions/upload-artifact@v4
