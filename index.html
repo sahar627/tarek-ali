@@ -1475,7 +1475,7 @@ function openShare() {
 
 
 /* لوحة تشرح نسخة أندرويد قبل أي تنزيل — بلا مفاجأة ولا لبس */
-const APK_URL = 'https://github.com/sahar627/tarek-ali/releases/latest/download/quran-adhkar.apk';
+const APK_URL = 'quran-adhkar.apk';   /* من نفس نطاق الموقع — أسرع وأضمن */
 function openAthanInfo() {
   openSheet(`
     <h3>لتشغيل الأذان والجهاز مغلق</h3>
@@ -1488,11 +1488,12 @@ function openAthanInfo() {
       <div class="chk ok"><span>✓</span><b>تؤذّن في وقتها ولو كانت الشاشة مقفلة</b></div>
     </div>
     <p class="hint" style="margin:12px 0 0">
-      سيسألك جوالك عن السماح بالتثبيت من هذا المصدر — سؤال معتاد لكل تطبيق
+      حجم التطبيق ٣ ميجابايت، وقد يستغرق التنزيل وقتاً إن كان اتصالك بطيئاً.
+      وسيسألك جوالك عن السماح بالتثبيت من هذا المصدر — سؤال معتاد لكل تطبيق
       خارج المتجر، اضغط «سماح» ثم «تثبيت».</p>
     <div class="sheet-actions">
-      <a class="installbtn" id="apkGo" href="${APK_URL}" style="text-decoration:none;margin-top:4px">
-        <span>متابعة</span></a>
+      <a class="installbtn" id="apkGo" href="${APK_URL}" download
+        style="text-decoration:none;margin-top:4px"><span>متابعة — ٣ ميجابايت</span></a>
       <button data-close>ليس الآن</button>
     </div>`);
 }
