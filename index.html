@@ -994,7 +994,9 @@ const player = {
 
 /* ================= التفسير الميسر ================= */
 let TAFSIR = null, HAS_TAFSIR = false;
-if (window.fetch) {
+if (NATIVE) {
+  try { HAS_TAFSIR = !!(Sahar.hasTafsir && Sahar.hasTafsir()); } catch {}
+} else if (window.fetch) {
   try {
     fetch('tafsir.json', { method: 'HEAD' })
       .then(r => { HAS_TAFSIR = r.ok; })
@@ -1002,11 +1004,20 @@ if (window.fetch) {
   } catch {}
 }
 if (document.getElementById('d-tafsir')) HAS_TAFSIR = true;
-async function tafsir() {
-  if (TAFSIR) return TAFSIR;
-  TAFSIR = embedded('d-tafsir') || await loadJSON('tafsir.json');
-  return TAFSIR;
+
+/* تفسير سورة واحدة: من الحزمة داخل التطبيق، ومن الملف على الويب */
+const TAF_CACHE = {};
+async function tafsirFor(si) {
+  if (TAF_CACHE[si]) return TAF_CACHE[si];
+  if (NATIVE) {
+    const raw = Sahar.tafsirSurah(si);
+    if (!raw) throw new Error('لا يوجد تفسير');
+    return (TAF_CACHE[si] = JSON.parse(raw));
+  }
+  if (!TAFSIR) TAFSIR = embedded('d-tafsir') || await loadJSON('tafsir.json');
+  return (TAF_CACHE[si] = TAFSIR.text[si - 1]);
 }
+const TAF_SRC = 'التفسير الميسر — مجمع الملك فهد لطباعة المصحف الشريف';
 
 /* ================= متتبّع الختمة ================= */
 /* فهرس تراكمي لبداية كل سورة في ترتيب الآيات الكلي */
@@ -1834,12 +1845,12 @@ async function viewSurah(si, ai) {
     if (tfb) tfb.onclick = async () => {
       tfb.textContent = 'جارٍ الفتح…';
       try {
-        const T = await tafsir();
-        const t = T.text[si - 1][no - 1] || '—';
+        const arr = await tafsirFor(si);
+        const t = arr[no - 1] || '—';
         openSheet(`<h3>التفسير الميسر — ${esc(s.n)}: ${AR(no)}</h3>
           <p style="font-family:'AmiriQuran',serif;font-size:1.12rem;line-height:2.1;margin:0 0 10px">${esc(txt)}</p>
           <div class="tafsir">${esc(t).split('\n').join('<br>')}</div>
-          <p class="hint" style="margin-top:9px">${esc(T.src || '')}</p>
+          <p class="hint" style="margin-top:9px">${esc(TAF_SRC)}</p>
           <div class="sheet-actions"><button data-close>إغلاق</button></div>`);
       } catch { tfb.textContent = 'تعذّر فتح التفسير'; }
     };
