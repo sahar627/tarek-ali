@@ -1700,6 +1700,126 @@ async function viewHome() {
 }
 
 
+
+/* ================= تنبيهات عبر تقويم الجهاز =================
+   نولّد ملف تقويم قياسياً فيه مواعيد الصلوات مع منبّهاتها.
+   بعد إضافته يتولّى التقويمُ التنبيهَ: يعمل والتطبيق مغلق، وعلى الآيفون أيضاً. */
+function pad2(n) { return String(n).padStart(2, '0'); }
+function icsStamp(d) {
+  return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) + 'T'
+       + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + '00Z';
+}
+function buildICS(days) {
+  const now = new Date();
+  const city = currentCity();
+  const L = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//القرآن والأذكار//مواقيت الصلاة//AR',
+    'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'X-WR-CALNAME:مواقيت الصلاة — ' + city.n
+  ];
+  let count = 0;
+  for (let off = 0; off < days; off++) {
+    const day = new Date(now.getTime() + off * 864e5);
+    const { t } = todayTimes(day);
+    for (const [k, name] of PRAYERS) {
+      if (k === 'sunrise' || isNaN(t[k])) continue;
+      const at = new Date(atMillis(day, t[k]));
+      if (at.getTime() < now.getTime()) continue;
+      const end = new Date(at.getTime() + 5 * 60000);
+      L.push('BEGIN:VEVENT');
+      L.push('UID:' + k + '-' + at.getTime() + '@quran-adhkar');
+      L.push('DTSTAMP:' + icsStamp(now));
+      L.push('DTSTART:' + icsStamp(at));
+      L.push('DTEND:' + icsStamp(end));
+      L.push('SUMMARY:صلاة ' + name);
+      L.push('DESCRIPTION:حان وقت صلاة ' + name + ' — ' + city.n);
+      L.push('BEGIN:VALARM');
+      L.push('ACTION:DISPLAY');
+      L.push('TRIGGER:PT0M');
+      L.push('DESCRIPTION:حان الآن وقت صلاة ' + name);
+      L.push('END:VALARM');
+      if (prefs.before > 0) {
+        L.push('BEGIN:VALARM');
+        L.push('ACTION:DISPLAY');
+        L.push('TRIGGER:-PT' + prefs.before + 'M');
+        L.push('DESCRIPTION:اقترب وقت صلاة ' + name);
+        L.push('END:VALARM');
+      }
+      L.push('END:VEVENT');
+      count++;
+    }
+  }
+  /* تنبيه أخير قبل نفاد المواعيد بأسبوعين، لئلا ينقطع التنبيه فجأة */
+  const endAt = new Date(now.getTime() + (days - 14) * 864e5);
+  endAt.setHours(9, 0, 0, 0);
+  L.push('BEGIN:VEVENT');
+  L.push('UID:renew-' + endAt.getTime() + '@quran-adhkar');
+  L.push('DTSTAMP:' + icsStamp(now));
+  L.push('DTSTART:' + icsStamp(endAt));
+  L.push('DTEND:' + icsStamp(new Date(endAt.getTime() + 15 * 60000)));
+  L.push('SUMMARY:جدّد مواقيت الصلاة');
+  L.push('DESCRIPTION:قاربت مواقيت الصلاة المحفوظة على الانتهاء — افتح التطبيق وأضفها من جديد');
+  L.push('BEGIN:VALARM');
+  L.push('ACTION:DISPLAY');
+  L.push('TRIGGER:PT0M');
+  L.push('DESCRIPTION:جدّد مواقيت الصلاة في التقويم');
+  L.push('END:VALARM');
+  L.push('END:VEVENT');
+
+  L.push('END:VCALENDAR');
+  return { text: L.join('\r\n'), count };
+}
+
+async function exportICS(days, btn) {
+  if (btn) btn.textContent = 'جارٍ التجهيز…';
+  let out;
+  try { out = buildICS(days); }
+  catch { if (btn) btn.textContent = 'تعذّر التجهيز'; return; }
+  const blob = new Blob([out.text], { type: 'text/calendar;charset=utf-8' });
+  const name = 'مواقيت-الصلاة.ics';
+  const file = new File([blob], name, { type: 'text/calendar' });
+  if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+    try { await navigator.share({ files: [file], title: 'مواقيت الصلاة' }); } catch {}
+  } else {
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = u; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 5000);
+  }
+  prefs.ics = { at: Date.now(), city: currentCity().n,
+                until: Date.now() + days * 864e5 };
+  store.set('prefs', prefs);
+  banner('جاهز', `مواقيت سنة كاملة — افتح الملف ليضيفه التقويم`);
+}
+
+function openCalendarSheet() {
+  const saved = prefs.ics;
+  const moved = saved && saved.city !== currentCity().n;
+  openSheet(`
+    <h3>تنبيه بالصلاة والتطبيق مغلق</h3>
+    <p class="hint" style="margin:0 0 12px">
+      يضيف مواقيت الصلاة <b>لسنة كاملة</b> إلى تقويم جوالك، فيتولّى التقويمُ تنبيهك في وقتها —
+      ولو كان التطبيق مغلقاً أو الجهاز مقفلاً.</p>
+    <div class="card" style="padding:4px 12px">
+      <div class="chk ok"><span>✓</span><b>يعمل على الآيفون والأندرويد</b></div>
+      <div class="chk ok"><span>✓</span><b>تنبيه عند دخول الوقت، وآخر قبله بالمدة التي اخترتها</b></div>
+      <div class="chk ok"><span>✓</span><b>محسوب على موقعك، ولا يحتاج إنترنت بعد الإضافة</b></div>
+      <div class="chk ok"><span>✓</span><b>يذكّرك بنفسه قبل انتهاء السنة بأسبوعين</b></div>
+    </div>
+    ${moved ? `<div class="notice">مواقيتك المحفوظة على <b>${esc(saved.city)}</b>،
+      وموقعك الآن <b>${esc(currentCity().n)}</b>. أضفها من جديد ليصحّ التنبيه.</div>` : ''}
+    <p class="hint" style="margin:12px 0 0">
+      افتح الملف بعد نزوله، فيسألك التقويم عن الإضافة. وإن انتقلت إلى بلد آخر، أعد الإضافة.</p>
+    <div class="sheet-actions">
+      <button class="installbtn" id="icsGo" style="margin-top:4px">
+        <span>${moved ? 'تحديث المواقيت لموقعي الحالي' : 'إضافة مواقيت سنة إلى التقويم'}</span></button>
+      <button data-close>إغلاق</button>
+    </div>`);
+  const g = $('#icsGo');
+  if (g) g.onclick = () => exportICS(365, g);
+}
+
 /* ================= شاشة الختمة ================= */
 async function viewKhatma() {
   setBar('الختمة', 'وِرد يومي وتتبّع', '#/home'); setTab('home');
@@ -1855,6 +1975,11 @@ function viewTimes() {
             style="justify-content:center;margin-top:8px;font-family:system-ui;font-size:.86rem">تفعيل الإشعارات</button>` : ''}`;
       })()}
       <button class="row" id="try" style="justify-content:center;margin-top:8px;font-family:system-ui;font-size:.86rem">تجربة النغمة</button>
+      ${(!NATIVE && prefs.ics && prefs.ics.city !== currentCity().n) ? `<div class="notice">
+        تنبيهات التقويم محفوظة على <b>${esc(prefs.ics.city)}</b> وقد تغيّر موقعك — جدّدها.</div>` : ''}
+      ${NATIVE ? '' : `<button class="apkbtn" id="icsBtn" style="margin-top:10px">
+        ${svg('bell')}<span>${prefs.ics ? 'جدّد تنبيهات التقويم' : 'أضف التنبيهات إلى تقويم جوالك'}<small>${
+          prefs.ics ? 'محفوظة على ' + esc(prefs.ics.city) : 'لتصلك ولو كان التطبيق مغلقاً'}</small></span></button>`}
       ${NATIVE ? (() => {
         let st = null;
         try { st = JSON.parse(Sahar.status()); } catch {}
@@ -1948,6 +2073,9 @@ function viewTimes() {
     if (ta) ta.onclick = () => {
       try { Sahar.testAlarm(); ta.textContent = 'ضُبط التنبيه — أغلق التطبيق الآن'; } catch {}
     };
+    const icsb = $('#icsBtn');
+    if (icsb) icsb.onclick = () => { snd.open(); openCalendarSheet(); };
+
     const pe = $('#permExact'); if (pe) pe.onclick = () => { try { Sahar.openExactSettings(); } catch {} };
     const pb = $('#permBatt'); if (pb) pb.onclick = () => { try { Sahar.openBatterySettings(); } catch {} };
 
