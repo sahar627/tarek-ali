@@ -1836,7 +1836,9 @@ async function viewSurah(si, ai) {
       <div class="sheet-actions">
         ${HAS_TAFSIR ? '<button id="tf">التفسير الميسر</button>' : ''}
         <button id="img">مشاركة الآية كصورة</button>
-        ${RECITE.length ? `<button id="ls">استماع من هذه الآية</button>` : ''}
+        ${RECITE.length ? `<button id="ls"><b>استماع من هذه الآية</b>
+          <span class="hint" style="display:block">${esc(reciterById(prefs.reciter)?.name || '')}${
+            navigator.onLine === false ? ' · يحتاج اتصالاً بالإنترنت' : ''}</span></button>` : ''}
         <button id="cp">نسخ الآية</button>
         <button id="mk">${isMarked ? 'إزالة العلامة' : 'حفظ علامة عند هذه الآية'}</button>
         <button data-close>إغلاق</button>
