@@ -25,6 +25,23 @@ jobs:
           java -version 2>&1 || true
           gradle --version 2>&1 | head -5 || echo "gradle غير مثبّت بعد"
 
+      - name: تجهيز أصول التطبيق من ملفات المستودع
+        run: |
+          set -e
+          mkdir -p android/app/src/main/assets/tafsir
+          cp index.html android/app/src/main/assets/index.html
+          python3 - <<'PY'
+          import json, os
+          d = json.load(open('tafsir.json', encoding='utf-8'))
+          os.makedirs('android/app/src/main/assets/tafsir', exist_ok=True)
+          for i, s in enumerate(d['text'], 1):
+              json.dump(s, open(f'android/app/src/main/assets/tafsir/{i}.json', 'w', encoding='utf-8'),
+                        ensure_ascii=False, separators=(',', ':'))
+          print('قُسّم التفسير إلى', len(d['text']), 'ملفاً')
+          PY
+          ls -la android/app/src/main/assets | head
+          du -sh android/app/src/main/assets
+
       - name: تجهيز Java
         uses: actions/setup-java@v4
         with:
