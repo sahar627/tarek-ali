@@ -406,6 +406,9 @@ input[type=range]{width:145px;accent-color:var(--accent)}
   border-radius:6px;background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-line);
   font-family:system-ui,sans-serif;font-size:.48em;font-weight:700;vertical-align:middle}
 
+/* ===== تقليب الصفحة ===== */
+.mushaf{will-change:transform,opacity;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+
 </style>
 </head>
 <body>
@@ -2012,6 +2015,90 @@ function search(raw, list, q) {
     '<p class="empty">لا نتائج. جرّب كلمة أقصر أو بدون حركات.</p>';
 }
 
+
+/* ================= تقليب الصفحات بالسحب =================
+   في المصحف: السحب لليمين يقدّم الصفحة، ولليسار يرجعها. */
+let swipeOff = null;                 /* لفكّ ارتباط مستمعي الفأرة عند إعادة الرسم */
+
+function bindSwipe(el, onNext, onPrev) {
+  if (swipeOff) { swipeOff(); swipeOff = null; }
+
+  let x0 = 0, y0 = 0, t0 = 0;
+  let active = false;                /* بدأ اللمس */
+  let axis = 0;                      /* 0 لم يُحدَّد بعد، 1 أفقي، 2 رأسي */
+  let dx = 0;
+  const LOCK = 12, MIN = 55, MAX_OFF = 110;
+
+  const reset = () => {
+    el.style.transition = 'transform .22s ease, opacity .22s ease';
+    el.style.transform = ''; el.style.opacity = '';
+  };
+  const start = e => {
+    if (e.touches && e.touches.length > 1) return;
+    const p = e.touches ? e.touches[0] : e;
+    x0 = p.clientX; y0 = p.clientY; t0 = Date.now();
+    active = true; axis = 0; dx = 0;
+    el.style.transition = 'none';
+  };
+  const move = e => {
+    if (!active) return;
+    const p = e.touches ? e.touches[0] : e;
+    const ax = p.clientX - x0, ay = p.clientY - y0;
+
+    /* لا نحكم على الاتجاه إلا بعد حركة كافية — وإلا قتلت اهتزازةُ الإصبع السحبَ */
+    if (axis === 0) {
+      if (Math.abs(ax) < LOCK && Math.abs(ay) < LOCK) return;
+      axis = Math.abs(ax) > Math.abs(ay) ? 1 : 2;
+      if (axis === 2) { active = false; reset(); return; }
+    }
+    dx = ax;
+    const shift = Math.max(-MAX_OFF, Math.min(MAX_OFF, dx * 0.45));
+    el.style.transform = 'translateX(' + shift + 'px)';
+    el.style.opacity = String(1 - Math.min(0.35, Math.abs(dx) / 900));
+    if (e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if (!active) return;
+    active = false;
+    if (axis !== 1) { reset(); return; }
+    const fast = Date.now() - t0 < 340 && Math.abs(dx) > 30;
+    if (dx > MIN || (fast && dx > 0)) { flip(el, 1); onNext(); }
+    else if (dx < -MIN || (fast && dx < 0)) { flip(el, -1); onPrev(); }
+    else reset();
+  };
+
+  el.addEventListener('touchstart', start, { passive: true });
+  el.addEventListener('touchmove', move, { passive: false });
+  el.addEventListener('touchend', end);
+  el.addEventListener('touchcancel', end);
+  el.addEventListener('mousedown', start);
+  addEventListener('mousemove', move);
+  addEventListener('mouseup', end);
+  /* تُنزع مستمعات النافذة عند رسم صفحة جديدة، فلا تتراكم */
+  swipeOff = () => {
+    removeEventListener('mousemove', move);
+    removeEventListener('mouseup', end);
+  };
+}
+/* حركة خروج الصفحة ثم دخول التالية */
+function flip(el, dir) {
+  el.style.transition = 'transform .22s ease, opacity .22s ease';
+  el.style.transform = 'translateX(' + (dir * 60) + '%)';
+  el.style.opacity = '0';
+  snd.page();
+}
+function flipIn(el, dir) {
+  el.style.transition = 'none';
+  el.style.transform = 'translateX(' + (-dir * 45) + '%)';
+  el.style.opacity = '0';
+  requestAnimationFrame(() => {
+    el.style.transition = 'transform .26s ease, opacity .26s ease';
+    el.style.transform = 'translateX(0)';
+    el.style.opacity = '1';
+  });
+}
+let flipDir = 0;   /* اتجاه آخر تقليب، لتدخل الصفحة الجديدة من الجهة الصحيحة */
+
 let io = null;
 
 /* ينقلنا إلى الصفحة التي تحوي آية معيّنة */
@@ -2069,13 +2156,23 @@ function renderPage(q, p, focusIdx) {
     ${sizerHTML()}
     <div class="mushaf" id="mushaf">${body}</div>
     <div class="pager">
-      ${p > 1 ? `<a href="#/p/${p - 1}">الصفحة السابقة</a>` : '<span></span>'}
+      ${p > 1 ? `<a href="#/p/${p - 1}" data-dir="-1">الصفحة السابقة</a>` : '<span></span>'}
       <a href="#/mushaf" class="pmid">${AR(p)} / ${AR(pageCount(q))}</a>
-      ${p < pageCount(q) ? `<a href="#/p/${p + 1}">الصفحة التالية</a>` : '<span></span>'}
+      ${p < pageCount(q) ? `<a href="#/p/${p + 1}" data-dir="1">الصفحة التالية</a>` : '<span></span>'}
     </div>`;
 
   bindSizer();
   if (prefs.awake !== false) keepAwake(true);
+
+  const sheetEl = $('#mushaf');
+  if (flipDir) { flipIn(sheetEl, flipDir); flipDir = 0; }
+  bindSwipe(sheetEl,
+    () => { if (p < pageCount(q)) { flipDir = 1; location.hash = '#/p/' + (p + 1); } },
+    () => { if (p > 1) { flipDir = -1; location.hash = '#/p/' + (p - 1); } });
+
+  view.querySelectorAll('.pager a[data-dir]').forEach(a => {
+    a.addEventListener('click', () => { flipDir = +a.dataset.dir; snd.page(); });
+  });
 
   $('#mushaf').addEventListener('click', e => {
     const el = e.target.closest('.ayah'); if (!el) return;
