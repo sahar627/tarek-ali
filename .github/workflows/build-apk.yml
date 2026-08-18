@@ -117,7 +117,7 @@ jobs:
             echo "لا جديد في ملف التطبيق"
             exit 0
           fi
-          git commit -m "تحديث تطبيق أندرويد [skip ci]"
+          git commit -m "تحديث تطبيق أندرويد"
           # الفرع قد يتحرّك أثناء البناء، فنعيد المحاولة بدل أن نفشل
           for i in 1 2 3 4 5; do
             git fetch origin main
