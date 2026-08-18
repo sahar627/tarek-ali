@@ -999,7 +999,7 @@ function installCard() {
     <section class="install">
       <div class="ih"><span class="ico g">${svg('pin')}</span>
         <div><b>احفظ نسخة من هذا الملف</b>
-        <small>يعمل بلا إنترنت وبلا استضافة. أرسله كما هو لمن شئت.</small></div></div>
+        <small>يعمل بلا إنترنت. أرسله كما هو لمن شئت.</small></div></div>
     </section>`;
   return `
     <button class="installbtn" id="installNow">
@@ -1396,7 +1396,7 @@ function viewTimes() {
             إن وصلك الإشعار وسمعت التكبيرات بعد دقيقة، فالمنظومة تعمل.</p>`;
       })() : ''}
       ${NATIVE ? `<div class="notice"><b>الأذان يعمل والتطبيق مغلق.</b><br>
-        النظام يوقظ الجهاز في وقت كل صلاة فيؤذّن، بلا إنترنت وبلا خوادم.
+        يوقظ جهازك في وقت كل صلاة فيؤذّن، ولو كان مغلقاً.
         ${(() => { try { return Sahar.exactAllowed() ? '' :
           '<br><br><b>تنبيه:</b> المنبّه الدقيق ممنوع في إعدادات جهازك، وقد يتأخر الأذان دقائق.'; }
           catch { return ''; } })()}</div>
@@ -1407,9 +1407,6 @@ function viewTimes() {
             catch { return '<button class="row" id="permBatt" style="flex:1;justify-content:center;font-family:system-ui;font-size:.83rem">استثناء من توفير البطارية</button>'; } })()}
         </div>`
         : ''}
-      ${ATHAN.length ? '' : `<div class="notice"><b>لإضافة أذان بصوت حقيقي:</b><br>
-        ضع ملف <b>athan.json</b> وملفاتك الصوتية بجوار ملفات التطبيق، فتظهر هنا تلقائياً.
-        النغمة الحالية نغمة إعلان لا تكبيراً بصوت بشري.</div>`}
 
       <div class="notice">
         الأوقات محسوبة فلكياً داخل جهازك بتوقيته المحلي، وقد تختلف دقيقة أو دقيقتين عن
@@ -1709,10 +1706,9 @@ function viewSettings() {
     <div class="mushaf" style="margin-top:11px;text-align-last:center">
       بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ<span class="num">١</span></div>
 
-    ${fileMode ? `<div class="notice"><b>أنت تشغّل النسخة الملفّية.</b><br>
-      هذا الملف الواحد يحوي كل شيء ويعمل بلا إنترنت وبلا استضافة.
-      ${persists ? '' : '<br><br><b>تنبيه:</b> متصفحك يمنع الحفظ في وضع الملف، فالعلامات والعدّادات تعمل أثناء الجلسة فقط.'}
-      </div>` : !standalone ? `<div class="notice"><b>لتثبيت التطبيق على الشاشة الرئيسية:</b><br>
+    ${fileMode ? (persists ? '' : `<div class="notice">
+      العلامات والعدّادات وآخر موضع قراءة تعمل الآن ولا تُحفظ بعد الإغلاق.</div>`)
+      : !standalone ? `<div class="notice"><b>لتثبيت التطبيق على الشاشة الرئيسية:</b><br>
       ${ios ? 'من متصفح Safari: زر المشاركة ⬆ ثم «إضافة إلى الشاشة الرئيسية».'
             : 'من قائمة المتصفح: «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».'}
       <br>بعدها يعمل بلا إنترنت.</div>
