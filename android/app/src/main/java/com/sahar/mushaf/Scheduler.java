@@ -84,10 +84,35 @@ public final class Scheduler {
             } else {
                 am.setExact(AlarmManager.RTC_WAKEUP, bestAt, pi);
             }
+            p.edit().putLong("nextAt", bestAt)
+                    .putString("nextKey", bestKey)
+                    .putBoolean("nextPre", bestPre).apply();
             Log.i("Sahar", "منبّه: " + bestKey + (bestPre ? " (تنبيه مسبق)" : "") + " بعد "
                     + ((bestAt - now) / 60000) + " دقيقة");
         } catch (SecurityException e) {
             am.set(AlarmManager.RTC_WAKEUP, bestAt, pi);
+        }
+    }
+
+    /** منبّه اختبار بعد عدد ثوانٍ — لمعرفة هل يعمل النظام دون انتظار صلاة */
+    public static void test(Context ctx, int seconds) {
+        long at = System.currentTimeMillis() + seconds * 1000L;
+        Intent i = new Intent(ctx, AlarmReceiver.class)
+                .setAction(ACTION_FIRE)
+                .putExtra("key", "test")
+                .putExtra("pre", false)
+                .putExtra("at", at);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = PendingIntent.getBroadcast(ctx, REQ + 1, i, flags);
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= 23)
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
+            else am.setExact(AlarmManager.RTC_WAKEUP, at, pi);
+        } catch (SecurityException e) {
+            am.set(AlarmManager.RTC_WAKEUP, at, pi);
         }
     }
 
@@ -101,6 +126,7 @@ public final class Scheduler {
     }
 
     public static String nameOf(String key) {
+        if ("test".equals(key)) return "اختبار";
         for (int i = 0; i < Prayer.KEYS.length; i++)
             if (Prayer.KEYS[i].equals(key)) return Prayer.NAMES[i];
         return key;
