@@ -47,16 +47,21 @@ public class AlarmReceiver extends BroadcastReceiver {
         if (Scheduler.prefs(ctx).getBoolean("vib", true)) vibrate(ctx, pre, key);
 
         if (!pre) {
-            String asset = Scheduler.audioFor(ctx, key);
+            String asset = "test".equals(key) ? "audio/takbir.mp3" : Scheduler.audioFor(ctx, key);
             if (asset != null) {
                 Intent s = new Intent(ctx, AdhanService.class)
                         .putExtra("asset", asset)
                         .putExtra("name", name);
-                if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(s);
-                else ctx.startService(s);
+                try {
+                    if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(s);
+                    else ctx.startService(s);
+                } catch (Exception e) {
+                    /* منع النظام تشغيل الخدمة: على الأقل يصل الإشعار */
+                    notify(ctx, "تعذّر تشغيل الأذان", "افتح التطبيق واسمح له بالعمل في الخلفية");
+                }
             }
         }
-        Scheduler.scheduleNext(ctx);
+        if (!"test".equals(key)) Scheduler.scheduleNext(ctx);
     }
 
     private void notify(Context ctx, String title, String body) {
