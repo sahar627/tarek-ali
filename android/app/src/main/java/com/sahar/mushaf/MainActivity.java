@@ -220,6 +220,31 @@ public class MainActivity extends Activity {
         /** يضبط منبّهاً بعد دقيقة لاختبار المنظومة كلها */
         @JavascriptInterface
         public void testAlarm() { Scheduler.test(MainActivity.this, 60); }
+
+        /** هل التفسير مضمّن في الحزمة؟ */
+        @JavascriptInterface
+        public boolean hasTafsir() {
+            try { getAssets().open("tafsir/1.json").close(); return true; }
+            catch (Exception e) { return false; }
+        }
+
+        /** تفسير سورة واحدة — يُقرأ من الحزمة بلا إنترنت */
+        @JavascriptInterface
+        public String tafsirSurah(int n) {
+            java.io.InputStream in = null;
+            try {
+                in = getAssets().open("tafsir/" + n + ".json");
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                return new String(out.toByteArray(), "UTF-8");
+            } catch (Exception e) {
+                return "";
+            } finally {
+                try { if (in != null) in.close(); } catch (Exception ignored) { }
+            }
+        }
     }
 
     /* زر الرجوع يتنقّل داخل التطبيق قبل أن يخرج منه */
