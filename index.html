@@ -213,7 +213,8 @@ main{padding:14px 13px 30px;max-width:760px;margin-inline:auto}
 .dhikr{padding:15px;background:var(--surface);border:1px solid var(--frame);
   border-radius:var(--r);cursor:pointer}
 .dhikr.done{border-color:var(--gold-line);background:var(--surface2)}
-.dhikr .txt{font-family:'AmiriQuran',serif;font-size:1.25rem;line-height:2.15;white-space:pre-line}
+.dhikr .txt{font-family:'AmiriQuran',serif;font-size:calc(var(--q,1.45rem) * .86);
+  line-height:var(--lh,2.15);white-space:pre-line}
 .dhikr .meta{margin-top:12px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
   background:var(--surface2);font-family:system-ui,sans-serif;font-size:.78rem;
   color:var(--muted);line-height:1.75}
@@ -350,6 +351,30 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .chk.no span{background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-line)}
 .chk b{font-weight:600}
 
+/* ===== شريط حجم الخط ===== */
+.sizer{display:flex;align-items:center;gap:10px;margin-bottom:9px;padding:7px 10px;
+  background:var(--surface);border:1px solid var(--frame);border-radius:10px}
+.sizer span{flex:1;text-align:center;font-family:system-ui,sans-serif;font-size:.8rem;
+  color:var(--ink);opacity:.7}
+.sizer button{width:46px;height:36px;border-radius:8px;border:1px solid var(--gold-line);
+  background:var(--gold-dim);color:var(--gold);font-family:system-ui,sans-serif;
+  font-size:.95rem;font-weight:700}
+.sizer button:active{background:var(--gold);color:var(--bg)}
+
+/* ===== الختمة ===== */
+.khat{display:block;margin-top:11px;padding:14px;background:var(--surface);
+  border:1px solid var(--gold-line);border-radius:var(--r)}
+.kh-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.kh-top b{font-size:1.2rem;color:var(--gold);font-weight:700}
+.kh-top span{font-family:system-ui,sans-serif;font-size:.8rem;color:var(--ink);opacity:.75}
+.kh-range{margin-top:7px;font-size:1.05rem;font-weight:600;line-height:1.7}
+.kh-foot{margin-top:7px;font-family:system-ui,sans-serif;font-size:.79rem;
+  color:var(--ink);opacity:.75}
+
+/* ===== التفسير ===== */
+.tafsir{padding:12px 13px;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface2);font-size:1.05rem;line-height:2}
+
 </style>
 </head>
 <body>
@@ -417,7 +442,8 @@ const store = {
 
 const prefs = Object.assign(
   { theme: 'night', q: 1.45, lh: 2.35, snd: true, city: null, method: 'makkah', asr: 1,
-    alert: true, before: 15, chime: 'takbir', chimeFajr: 'same', vol: 1, vib: true },
+    alert: true, before: 15, chime: 'takbir', chimeFajr: 'same', vol: 1, vib: true,
+    awake: true, khatma: null },
   store.get('prefs', {}));
 let marks = store.get('marks', []);
 let last = store.get('last', null);
@@ -965,6 +991,145 @@ const player = {
   }
 };
 
+
+/* ================= التفسير الميسر ================= */
+let TAFSIR = null, HAS_TAFSIR = false;
+if (window.fetch) {
+  try {
+    fetch('tafsir.json', { method: 'HEAD' })
+      .then(r => { HAS_TAFSIR = r.ok; })
+      .catch(() => {});
+  } catch {}
+}
+if (document.getElementById('d-tafsir')) HAS_TAFSIR = true;
+async function tafsir() {
+  if (TAFSIR) return TAFSIR;
+  TAFSIR = embedded('d-tafsir') || await loadJSON('tafsir.json');
+  return TAFSIR;
+}
+
+/* ================= متتبّع الختمة ================= */
+/* فهرس تراكمي لبداية كل سورة في ترتيب الآيات الكلي */
+let OFFSETS = null;
+function offsets(q) {
+  if (OFFSETS) return OFFSETS;
+  OFFSETS = []; let n = 0;
+  for (const su of q.surahs) { OFFSETS.push(n); n += su.c; }
+  return OFFSETS;
+}
+const TOTAL_AYAT = 6236;
+function toIndex(q, si, ai) { return offsets(q)[si - 1] + ai; }          /* 1..6236 */
+function fromIndex(q, idx) {
+  const o = offsets(q);
+  idx = Math.max(1, Math.min(TOTAL_AYAT, idx));
+  let si = 1;
+  for (let i = 113; i >= 0; i--) if (idx > o[i]) { si = i + 1; break; }
+  return { s: si, a: idx - o[si - 1] };
+}
+function khatmaState(q) {
+  const k = prefs.khatma;
+  if (!k || !k.days) return null;
+  const done = last ? toIndex(q, last.s, last.a) : 0;
+  const perDay = Math.ceil(TOTAL_AYAT / k.days);
+  const dayNo = Math.max(1, Math.floor((Date.now() - k.startedAt) / 864e5) + 1);
+  const target = Math.min(TOTAL_AYAT, perDay * dayNo);
+  const from = fromIndex(q, Math.max(1, done + 1));
+  const to = fromIndex(q, Math.min(TOTAL_AYAT, Math.max(done + 1, target)));
+  return {
+    days: k.days, dayNo, done, target, perDay,
+    pct: Math.round(done / TOTAL_AYAT * 100),
+    behind: Math.max(0, target - done),
+    from, to,
+    finished: done >= TOTAL_AYAT
+  };
+}
+
+/* ================= مشاركة الآية كصورة ================= */
+async function ayahImage(text, title) {
+  const S = 1000, c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const x = c.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const V = n => css.getPropertyValue(n).trim() || '#000';
+  const bg = '#0A100E', gold = '#D9B26A', ink = '#F0EBDD';
+
+  x.fillStyle = bg; x.fillRect(0, 0, S, S);
+  x.strokeStyle = gold; x.lineWidth = 4;
+  x.strokeRect(28, 28, S - 56, S - 56);
+  x.lineWidth = 1; x.globalAlpha = .45;
+  x.strokeRect(44, 44, S - 88, S - 88);
+  x.globalAlpha = 1;
+
+  try { await document.fonts.load('64px AmiriQuran'); await document.fonts.ready; } catch {}
+
+  x.direction = 'rtl'; x.textAlign = 'center'; x.fillStyle = ink;
+  let size = 62;
+  const maxW = S - 170;
+  let lines = [];
+  const wrap = fs => {
+    x.font = fs + 'px AmiriQuran, serif';
+    const words = text.split(' ');
+    const out = []; let cur = '';
+    for (const w of words) {
+      const t = cur ? cur + ' ' + w : w;
+      if (x.measureText(t).width > maxW && cur) { out.push(cur); cur = w; }
+      else cur = t;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  for (; size >= 26; size -= 3) {
+    lines = wrap(size);
+    if (lines.length * size * 2.05 < S - 300) break;
+  }
+  const lh = size * 2.05;
+  let y = S / 2 - (lines.length - 1) * lh / 2;
+  for (const ln of lines) { x.fillText(ln, S / 2, y); y += lh; }
+
+  x.font = '30px system-ui, sans-serif'; x.fillStyle = gold;
+  x.fillText(title, S / 2, S - 120);
+  x.beginPath(); x.moveTo(S / 2 - 90, S - 96); x.lineTo(S / 2 + 90, S - 96);
+  x.strokeStyle = gold; x.lineWidth = 1; x.stroke();
+  x.font = '24px system-ui, sans-serif'; x.globalAlpha = .75;
+  x.fillText('القرآن والأذكار', S / 2, S - 60);
+
+  return new Promise(res => c.toBlob(res, 'image/png'));
+}
+
+async function shareAyahImage(text, title, btn) {
+  if (btn) btn.textContent = 'جارٍ التجهيز…';
+  let blob;
+  try { blob = await ayahImage(text, title); } catch { if (btn) btn.textContent = 'تعذّر إنشاء الصورة'; return; }
+  if (!blob) { if (btn) btn.textContent = 'تعذّر إنشاء الصورة'; return; }
+  const file = new File([blob], 'ayah.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+    try { await navigator.share({ files: [file], title }); } catch {}
+  } else {
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = u; a.download = 'ayah.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 4000);
+    banner('نُزّلت الصورة', 'أرسلها الآن من معرض الصور');
+  }
+  if (btn) btn.textContent = 'مشاركة الآية كصورة';
+}
+
+/* ================= إبقاء الشاشة مضاءة ================= */
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on) {
+      if (!('wakeLock' in navigator) || wakeLock) return;
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && prefs.awake && location.hash.startsWith('#/s/')) keepAwake(true);
+});
+
 /* ---------- اللوحة المنبثقة والشريط ---------- */
 const view = $('#view'), sheet = $('#sheet'), backdrop = $('#backdrop');
 function openSheet(html) {
@@ -1233,6 +1398,23 @@ async function viewHome() {
       <span class="place">${esc(currentCity().n)}${hj ? ' · ' + esc(hj) : ''}</span>
     </a>
 
+    ${(() => {
+      const k = khatmaState(q);
+      if (!k) return `<a class="tile wide" href="#/khatma" style="margin-top:11px">
+        <span class="ico g">${svg('book')}</span>
+        <div><b>ابدأ ختمة</b><small>وِرد يومي محسوب، وتتبّع لما قرأت</small></div>
+        <span class="arrow">‹</span></a>`;
+      if (k.finished) return `<a class="next" href="#/khatma" style="text-align:center">
+        <span class="lbl">الحمد لله</span><b class="pname">أتممت الختمة</b>
+        <span class="place">اضغط لبدء ختمة جديدة</span></a>`;
+      return `<a class="khat" href="#/s/${k.from.s}/${k.from.a}">
+        <div class="kh-top"><b>وِردك اليوم</b><span>اليوم ${AR(k.dayNo)} من ${AR(k.days)}</span></div>
+        <div class="kh-range">من ${esc(q.surahs[k.from.s - 1].n)} ${AR(k.from.a)}
+          إلى ${esc(q.surahs[k.to.s - 1].n)} ${AR(k.to.a)}</div>
+        <span class="progress"><i style="width:${k.pct}%"></i></span>
+        <div class="kh-foot">${k.behind ? 'بقي ' + AR(k.behind) + ' آية اليوم' : 'أتممت وِرد اليوم ✓'}
+          · ${AR(k.pct)}٪ من المصحف</div></a>`;
+    })()}
     ${last ? `<a class="tile wide" href="#/s/${last.s}/${last.a}" style="margin-top:9px">
       <span class="ico g">${svg('book')}</span>
       <div><b>متابعة القراءة</b><small>سورة ${esc(q.surahs[last.s - 1].n)} — الآية ${AR(last.a)}</small></div>
@@ -1267,6 +1449,47 @@ async function viewHome() {
     el.textContent = dur(n.left);
     const b = $('#nextCard .pname'); if (b) b.textContent = n.name;
   }, 1000);
+}
+
+
+/* ================= شاشة الختمة ================= */
+async function viewKhatma() {
+  setBar('الختمة', 'وِرد يومي وتتبّع', '#/home'); setTab('home');
+  const q = await quran();
+  const k = khatmaState(q);
+
+  view.innerHTML = k ? `
+    <div class="qcard" style="text-align:right">
+      <div class="kh-top"><b>اليوم ${AR(k.dayNo)} من ${AR(k.days)}</b><span>${AR(k.pct)}٪</span></div>
+      <span class="progress" style="margin:10px 0"><i style="width:${k.pct}%"></i></span>
+      <p class="hint">قرأت ${AR(k.done)} آية من ${AR(TOTAL_AYAT)} · الوِرد اليومي ${AR(k.perDay)} آية</p>
+      ${k.finished ? '<p class="hint"><b>تمت الختمة، تقبّل الله.</b></p>' : `
+        <div class="kh-range" style="margin-top:8px">وِرد اليوم: من ${esc(q.surahs[k.from.s - 1].n)} ${AR(k.from.a)}
+          إلى ${esc(q.surahs[k.to.s - 1].n)} ${AR(k.to.a)}</div>`}
+    </div>
+    ${!k.finished ? `<a class="installbtn" href="#/s/${k.from.s}/${k.from.a}"
+      style="text-decoration:none">${svg('book')}<span>اقرأ وِرد اليوم</span></a>` : ''}
+    <button class="row" id="khEnd" style="justify-content:center;margin-top:10px;font-family:system-ui;font-size:.88rem">
+      ${k.finished ? 'ابدأ ختمة جديدة' : 'إنهاء الختمة'}</button>
+    <p class="hint" style="margin-top:9px">يُحسب ما قرأت من آخر موضع تبلغه في المصحف تلقائياً.</p>`
+  : `
+    <div class="qcard" style="text-align:right">
+      <b style="font-size:1.2rem">ابدأ ختمة</b>
+      <p class="hint" style="margin-top:6px">اختر المدة، فيُحسب لك وِرد كل يوم ويُتابَع تقدّمك تلقائياً
+        من آخر موضع تبلغه في القراءة.</p>
+      <div class="chips" id="khDays" style="margin-top:12px">
+        ${[7, 15, 29, 30, 60, 90].map(dd => `<button class="chip" data-d="${dd}">${AR(dd)} يوماً</button>`).join('')}
+      </div>
+    </div>`;
+
+  const ch = $('#khDays');
+  if (ch) ch.onclick = e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    prefs.khatma = { days: +b.dataset.d, startedAt: Date.now() };
+    store.set('prefs', prefs); snd.open(); viewKhatma();
+  };
+  const en = $('#khEnd');
+  if (en) en.onclick = () => { prefs.khatma = null; store.set('prefs', prefs); viewKhatma(); };
 }
 
 /* ================= المواقيت ================= */
@@ -1486,6 +1709,25 @@ function viewTimes() {
   }
 }
 
+
+/* شريط تكبير الخط — يظهر داخل المصحف والأذكار ليعرفه من لا يدخل الإعدادات */
+function sizerHTML() {
+  return `<div class="sizer">
+    <button data-d="-1" aria-label="تصغير الخط">أ−</button>
+    <span>حجم الخط</span>
+    <button data-d="1" aria-label="تكبير الخط">أ+</button>
+  </div>`;
+}
+function bindSizer() {
+  const el = $('.sizer'); if (!el) return;
+  el.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const step = 0.09 * (+b.dataset.d);
+    prefs.q = Math.min(2.4, Math.max(1.15, +(prefs.q + step).toFixed(2)));
+    store.set('prefs', prefs); applyType(); snd.tick();
+  };
+}
+
 /* ================= المصحف ================= */
 async function viewMushaf() {
   setBar('المصحف الشريف', '١١٤ سورة', '#/home'); setTab('mushaf');
@@ -1563,12 +1805,14 @@ async function viewSurah(si, ai) {
   view.innerHTML = `
     <div class="surah-head"><b>سورة ${esc(s.n)}</b><small>${s.t} · ${AR(s.c)} آية</small></div>
     ${si !== 1 && si !== 9 ? '<div class="basmala">بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ</div>' : ''}
+    ${sizerHTML()}
     <div class="mushaf" id="mushaf">${body}</div>
     <div class="pager">
       ${si > 1 ? `<a href="#/s/${si - 1}/1">السابقة: ${esc(q.surahs[si - 2].n)}</a>` : '<span></span>'}
       ${si < 114 ? `<a href="#/s/${si + 1}/1">التالية: ${esc(q.surahs[si].n)}</a>` : '<span></span>'}
     </div>`;
 
+  bindSizer();
   $('#mushaf').addEventListener('click', e => {
     const el = e.target.closest('.ayah'); if (!el) return;
     const no = +el.dataset.a, txt = q.text[si - 1][no - 1];
@@ -1579,12 +1823,28 @@ async function viewSurah(si, ai) {
       <h3>${esc(s.n)} — الآية ${AR(no)}</h3>
       <p style="font-family:'AmiriQuran',serif;font-size:1.22rem;line-height:2.15;margin:0">${esc(txt)}</p>
       <div class="sheet-actions">
-        ${RECITE.length ? `<button id="ls"><b>استماع من هذه الآية</b>
-          <span class="hint" style="display:block">${esc(reciterById(prefs.reciter)?.name || '')}</span></button>` : ''}
+        ${HAS_TAFSIR ? '<button id="tf">التفسير الميسر</button>' : ''}
+        <button id="img">مشاركة الآية كصورة</button>
+        ${RECITE.length ? `<button id="ls">استماع من هذه الآية</button>` : ''}
         <button id="cp">نسخ الآية</button>
         <button id="mk">${isMarked ? 'إزالة العلامة' : 'حفظ علامة عند هذه الآية'}</button>
         <button data-close>إغلاق</button>
       </div>`);
+    const tfb = $('#tf');
+    if (tfb) tfb.onclick = async () => {
+      tfb.textContent = 'جارٍ الفتح…';
+      try {
+        const T = await tafsir();
+        const t = T.text[si - 1][no - 1] || '—';
+        openSheet(`<h3>التفسير الميسر — ${esc(s.n)}: ${AR(no)}</h3>
+          <p style="font-family:'AmiriQuran',serif;font-size:1.12rem;line-height:2.1;margin:0 0 10px">${esc(txt)}</p>
+          <div class="tafsir">${esc(t).split('\n').join('<br>')}</div>
+          <p class="hint" style="margin-top:9px">${esc(T.src || '')}</p>
+          <div class="sheet-actions"><button data-close>إغلاق</button></div>`);
+      } catch { tfb.textContent = 'تعذّر فتح التفسير'; }
+    };
+    const imb = $('#img');
+    if (imb) imb.onclick = () => shareAyahImage(txt, `${s.n} — الآية ${AR(no)}`, imb);
     const lsb = $('#ls');
     if (lsb) lsb.onclick = () => { closeSheet(); player.start(si, no, s.c); };
     $('#cp').onclick = async () => {
@@ -1637,10 +1897,12 @@ async function viewGroup(gi) {
   if (!g) { location.hash = '#/adhkar'; return; }
   setBar(g.t, g.s, '#/adhkar'); setTab('adhkar');
 
-  view.innerHTML = `<div class="list" id="zlist">${g.items.map((it, ii) => card(gi, ii, it)).join('')}</div>
+  view.innerHTML = `${sizerHTML()}
+    <div class="list" id="zlist">${g.items.map((it, ii) => card(gi, ii, it)).join('')}</div>
     <button class="row" id="reset" style="justify-content:center;margin-top:12px;font-family:system-ui;font-size:.86rem">
       إعادة ضبط عدّادات هذا القسم</button>`;
 
+  bindSizer();
   $('#zlist').addEventListener('click', e => {
     const el = e.target.closest('.dhikr'); if (!el) return;
     const ii = +el.dataset.ii, it = g.items[ii], key = gi + ':' + ii;
@@ -1693,10 +1955,6 @@ function viewSettings() {
         <input id="fs" type="range" min="1.15" max="2.4" step="0.05" value="${prefs.q}"></div>
       <div class="set-row"><label for="lh">تباعد الأسطر</label>
         <input id="lh" type="range" min="1.9" max="3.2" step="0.05" value="${prefs.lh}"></div>
-      ${RECITE.length > 1 ? `<div class="set-row"><label for="rec">القارئ</label>
-        <select class="field" id="rec" style="width:auto;min-width:170px">
-          ${RECITE.map(r => `<option value="${esc(r.id)}"${prefs.reciter === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}
-        </select></div>` : ''}
       <div class="set-row"><label>أصوات الواجهة</label>
         <div class="chips" id="sd">
           <button class="chip" data-s="1" aria-pressed="${prefs.snd !== false}">تشغيل</button>
@@ -1742,8 +2000,6 @@ function viewSettings() {
     if (prefs.snd) snd.page();
     viewSettings();
   };
-  const rs = $('#rec');
-  if (rs) rs.onchange = e => { prefs.reciter = e.target.value; store.set('prefs', prefs); };
   $('#fs').oninput = e => { prefs.q = +e.target.value; store.set('prefs', prefs); applyType(); };
   $('#lh').oninput = e => { prefs.lh = +e.target.value; store.set('prefs', prefs); applyType(); };
   const ib2 = $('#install'); if (ib2) ib2.onclick = doInstall;
@@ -1784,6 +2040,7 @@ function route() {
   if (p[0] === 'adhkar') return viewAdhkar();
   if (p[0] === 'times') return viewTimes();
   if (p[0] === 'qibla') return viewQibla();
+  if (p[0] === 'khatma') return viewKhatma();
   if (p[0] === 'settings') return viewSettings();
   return viewHome();
 }
