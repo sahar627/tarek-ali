@@ -2019,72 +2019,87 @@ function search(raw, list, q) {
 
 
 /* ================= تقليب الصفحات بالسحب =================
-   في المصحف: السحب لليمين يقدّم الصفحة، ولليسار يرجعها. */
-let swipeOff = null;                 /* لفكّ ارتباط مستمعي الفأرة عند إعادة الرسم */
+   نستعمل أحداث المؤشّر مع «أسر المؤشّر»، فيصلنا رفعُ الإصبع مهما خرج عن حدود الصفحة. */
+let swipeOff = null;
 
 function bindSwipe(el, onNext, onPrev) {
   if (swipeOff) { swipeOff(); swipeOff = null; }
 
-  let x0 = 0, y0 = 0, t0 = 0;
-  let active = false;                /* بدأ اللمس */
-  let axis = 0;                      /* 0 لم يُحدَّد بعد، 1 أفقي، 2 رأسي */
+  let x0 = 0, y0 = 0, t0 = 0, id = null;
+  let axis = 0;                 /* 0 لم يُحسم، 1 أفقي، 2 رأسي */
   let dx = 0;
-  const LOCK = 12, MIN = 55, MAX_OFF = 110;
+  const LOCK = 6, MIN = 45, MAX_OFF = 120;
 
   const reset = () => {
-    el.style.transition = 'transform .22s ease, opacity .22s ease';
+    el.style.transition = 'transform .2s ease, opacity .2s ease';
     el.style.transform = ''; el.style.opacity = '';
   };
-  const start = e => {
-    if (e.touches && e.touches.length > 1) return;
-    const p = e.touches ? e.touches[0] : e;
-    x0 = p.clientX; y0 = p.clientY; t0 = Date.now();
-    active = true; axis = 0; dx = 0;
+  const begin = (x, y, pid) => {
+    x0 = x; y0 = y; t0 = Date.now(); id = pid; axis = 0; dx = 0;
     el.style.transition = 'none';
   };
-  const move = e => {
-    if (!active) return;
-    const p = e.touches ? e.touches[0] : e;
-    const ax = p.clientX - x0, ay = p.clientY - y0;
-
-    /* لا نحكم على الاتجاه إلا بعد حركة كافية — وإلا قتلت اهتزازةُ الإصبع السحبَ */
+  const drag = (x, y, ev) => {
+    if (id === null) return;
+    const ax = x - x0, ay = y - y0;
     if (axis === 0) {
       if (Math.abs(ax) < LOCK && Math.abs(ay) < LOCK) return;
-      axis = Math.abs(ax) > Math.abs(ay) ? 1 : 2;
-      if (axis === 2) { active = false; reset(); return; }
+      axis = Math.abs(ax) >= Math.abs(ay) ? 1 : 2;
+      if (axis === 2) { id = null; reset(); return; }
     }
     dx = ax;
-    const shift = Math.max(-MAX_OFF, Math.min(MAX_OFF, dx * 0.45));
+    const shift = Math.max(-MAX_OFF, Math.min(MAX_OFF, dx * 0.5));
     el.style.transform = 'translateX(' + shift + 'px)';
-    el.style.opacity = String(1 - Math.min(0.35, Math.abs(dx) / 900));
-    if (e.cancelable) e.preventDefault();
+    el.style.opacity = String(1 - Math.min(0.3, Math.abs(dx) / 900));
+    if (ev && ev.cancelable) ev.preventDefault();
   };
-  const end = () => {
-    if (!active) return;
-    active = false;
+  const finish = () => {
+    if (id === null) { if (axis !== 1) reset(); return; }
+    const moved = dx, quick = Date.now() - t0 < 400 && Math.abs(dx) > 25;
+    id = null;
     if (axis !== 1) { reset(); return; }
-    const fast = Date.now() - t0 < 340 && Math.abs(dx) > 30;
-    if (dx > MIN || (fast && dx > 0)) { flip(el, 1); onNext(); }
-    else if (dx < -MIN || (fast && dx < 0)) { flip(el, -1); onPrev(); }
+    if (moved > MIN || (quick && moved > 0)) { flip(el, 1); onNext(); }
+    else if (moved < -MIN || (quick && moved < 0)) { flip(el, -1); onPrev(); }
     else reset();
   };
 
-  el.addEventListener('touchstart', start, { passive: true });
-  el.addEventListener('touchmove', move, { passive: false });
-  el.addEventListener('touchend', end);
-  el.addEventListener('touchcancel', end);
-  el.addEventListener('mousedown', start);
-  addEventListener('mousemove', move);
-  addEventListener('mouseup', end);
-  /* تُنزع مستمعات النافذة عند رسم صفحة جديدة، فلا تتراكم */
-  swipeOff = () => {
-    removeEventListener('mousemove', move);
-    removeEventListener('mouseup', end);
-  };
+  if (window.PointerEvent) {
+    const down = e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      try { el.setPointerCapture(e.pointerId); } catch {}
+      begin(e.clientX, e.clientY, e.pointerId);
+    };
+    const mv = e => { if (e.pointerId === id) drag(e.clientX, e.clientY, e); };
+    const up = e => { if (e.pointerId === id || id === null) finish(); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', mv);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('lostpointercapture', up);
+    swipeOff = () => {
+      el.removeEventListener('pointerdown', down);
+      el.removeEventListener('pointermove', mv);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      el.removeEventListener('lostpointercapture', up);
+    };
+  } else {
+    const ts = e => { if (e.touches.length === 1) begin(e.touches[0].clientX, e.touches[0].clientY, 1); };
+    const tm = e => { if (e.touches.length === 1) drag(e.touches[0].clientX, e.touches[0].clientY, e); };
+    const te = () => finish();
+    el.addEventListener('touchstart', ts, { passive: true });
+    el.addEventListener('touchmove', tm, { passive: false });
+    el.addEventListener('touchend', te);
+    el.addEventListener('touchcancel', te);
+    swipeOff = () => {
+      el.removeEventListener('touchstart', ts);
+      el.removeEventListener('touchmove', tm);
+      el.removeEventListener('touchend', te);
+      el.removeEventListener('touchcancel', te);
+    };
+  }
 }
-/* حركة خروج الصفحة ثم دخول التالية */
 function flip(el, dir) {
-  el.style.transition = 'transform .22s ease, opacity .22s ease';
+  el.style.transition = 'transform .2s ease, opacity .2s ease';
   el.style.transform = 'translateX(' + (dir * 60) + '%)';
   el.style.opacity = '0';
   snd.page();
