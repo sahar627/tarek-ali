@@ -1968,6 +1968,15 @@ function viewSettings() {
         <input id="fs" type="range" min="1.15" max="2.4" step="0.05" value="${prefs.q}"></div>
       <div class="set-row"><label for="lh">تباعد الأسطر</label>
         <input id="lh" type="range" min="1.9" max="3.2" step="0.05" value="${prefs.lh}"></div>
+      ${RECITE.length > 1 ? `<div class="set-row"><label for="rec">قارئ التلاوة</label>
+        <select class="field" id="rec" style="width:auto;min-width:170px">
+          ${RECITE.map(r => `<option value="${esc(r.id)}"${prefs.reciter === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}
+        </select></div>` : ''}
+      <div class="set-row"><label>إبقاء الشاشة مضاءة أثناء القراءة</label>
+        <div class="chips" id="wk">
+          <button class="chip" data-v="1" aria-pressed="${prefs.awake !== false}">تشغيل</button>
+          <button class="chip" data-v="0" aria-pressed="${prefs.awake === false}">إيقاف</button>
+        </div></div>
       <div class="set-row"><label>أصوات الواجهة</label>
         <div class="chips" id="sd">
           <button class="chip" data-s="1" aria-pressed="${prefs.snd !== false}">تشغيل</button>
@@ -2006,6 +2015,15 @@ function viewSettings() {
   $('#th').onclick = e => {
     const b = e.target.closest('.chip'); if (!b) return;
     prefs.theme = b.dataset.t; store.set('prefs', prefs); applyTheme(); viewSettings();
+  };
+  const rsel = $('#rec');
+  if (rsel) rsel.onchange = e => { prefs.reciter = e.target.value; store.set('prefs', prefs); };
+  const wk = $('#wk');
+  if (wk) wk.onclick = e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    prefs.awake = b.dataset.v === '1'; store.set('prefs', prefs);
+    if (!prefs.awake) keepAwake(false);
+    viewSettings();
   };
   $('#sd').onclick = e => {
     const b = e.target.closest('.chip'); if (!b) return;
