@@ -1,5 +1,5 @@
 /* سَحَر — عامل الخدمة (النسخة المسطّحة) */
-const V = 'sahar-flat-v32';
+const V = 'sahar-flat-v33';
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable.png', './icon-180.png', './og.png',
   './athan.json', './recite.json', './takbir.mp3', './makkah.mp3', './madinah.mp3',
@@ -21,7 +21,9 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const u = new URL(req.url);
+  if (req.method !== 'GET' || u.origin !== location.origin) return;
+  if (u.pathname.endsWith('.apk')) return;   /* يتولاه المتصفح مباشرة */
   e.respondWith((async () => {
     const hit = await caches.match(req, { ignoreSearch: true });
     if (hit) return hit;
