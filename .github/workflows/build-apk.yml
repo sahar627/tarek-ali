@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -80,6 +83,19 @@ jobs:
       - name: أين الناتج
         if: always()
         run: find android -name "*.apk" 2>/dev/null || echo "لم يُنتج أي APK"
+
+      # ينشر الملف برابط ثابت لا يتغيّر، يفتحه أي أحد بلا حساب GitHub
+      - name: نشر التطبيق برابط ثابت
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          APK=$(find android -name "*.apk" | head -1)
+          cp "$APK" quran-adhkar.apk
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest quran-adhkar.apk \
+            -t "القرآن والأذكار — آخر إصدار" \
+            -n "تطبيق أندرويد: المصحف والأذكار ومواقيت الصلاة والأذان في وقته. بلا إعلانات وبلا إنترنت."
 
       - name: رفع الملف الناتج
         uses: actions/upload-artifact@v4
