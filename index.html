@@ -1613,6 +1613,8 @@ function openShare() {
 
 
 /* لوحة تشرح نسخة أندرويد قبل أي تنزيل — بلا مفاجأة ولا لبس */
+const APP_VER = '2.2';
+const APP_HOME = 'https://sahar627.github.io/tarek-ali/update.html';
 const APK_URL = 'quran-adhkar.apk';        /* من نفس نطاق الموقع — أسرع */
 const APK_FALLBACK = 'https://github.com/sahar627/tarek-ali/releases/latest/download/quran-adhkar.apk';
 function openAthanInfo() {
@@ -2656,7 +2658,13 @@ function viewSettings() {
          اللهم اجعله في ميزان حسنات كلِّ من ساهم في بنائه ونشره</p>
       <span class="sig">طارق علي</span>
     </section>
-    <p class="hint" style="text-align:center;margin:14px 0 0">الإصدار ٢٫٠</p>`;
+    ${NATIVE ? `<div class="section-title">تحديث التطبيق</div>
+      <div class="card" style="padding:12px 13px">
+        <div class="chk ok"><span>${AR(APP_VER)}</span><b>الإصدار المثبّت عندك</b></div>
+        <a class="apkbtn" href="${APP_HOME}" target="_blank" rel="noopener"
+          style="margin-top:10px;text-decoration:none">${svg('down')}<span>ابحث عن تحديث</span></a>
+      </div>` : ''}
+    <p class="hint" style="text-align:center;margin:14px 0 0">الإصدار ${AR(APP_VER)}</p>`;
 
   $('#th').onclick = e => {
     const b = e.target.closest('.chip'); if (!b) return;
