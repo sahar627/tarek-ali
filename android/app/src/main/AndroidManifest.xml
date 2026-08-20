@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- لا توجد صلاحية إنترنت: التطبيق عاجز تقنياً عن الاتصال بأي جهة -->
+    <!-- الإنترنت للتلاوة الصوتية وحدها؛ بقية التطبيق يعمل بلا اتصال -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- الموقع للقبلة ومواقيت الصلاة — يعمل بالأقمار بلا إنترنت -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
