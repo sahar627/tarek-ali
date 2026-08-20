@@ -1537,31 +1537,17 @@ function viewQibla() {
 }
 
 
-/* ================= المشاركة ================= */
+/* ================= المشاركة =================
+   مشاركة الرابط وحده: واتساب وغيره يجلبون العنوان والوصف والصورة من الصفحة. */
+const SITE_URL = 'https://sahar627.github.io/tarek-ali/';
 const SHARE_TITLE = 'القرآن والأذكار — المصحف والأذكار ومواقيت الصلاة';
 const SHARE_TEXT = 'المصحف كاملاً، وأذكار الصباح والمساء وما بعد الصلاة، ومواقيت الصلاة.\n' +
-  'بلا إعلانات · يعمل بدون إنترنت · لا يجمع أي بيانات';
+  'بلا إعلانات · لا يجمع أي بيانات';
 
-/* نسخة مكتفية بذاتها: نجلب الملف الجاهز، وإلا نبني نسخة من الصفحة نفسها */
-async function appFileBlob() {
-  if (window.fetch && location.protocol.startsWith('http')) {
-    try {
-      const r = await fetch('sahar-mushaf.html');
-      if (r.ok) return await r.blob();
-    } catch {}
-  }
-  const doc = document.documentElement.cloneNode(true);
-  const v = doc.querySelector('#view'); if (v) v.innerHTML = '';
-  doc.querySelectorAll('.toast').forEach(x => x.remove());
-  const sh = doc.querySelector('#sheet');
-  if (sh) { sh.innerHTML = ''; sh.setAttribute('hidden', ''); }
-  const bd = doc.querySelector('#backdrop'); if (bd) bd.setAttribute('hidden', '');
-  return new Blob(['<!DOCTYPE html>\n' + doc.outerHTML], { type: 'text/html' });
-}
-
-async function shareLink() {
-  const url = location.protocol.startsWith('http') ? location.href.split('#')[0] : '';
-  if (!url) return shareFile();
+async function openShare() {
+  const url = location.protocol.startsWith('http')
+    ? location.href.split('#')[0].split('?')[0]
+    : SITE_URL;
   if (navigator.share) {
     try { await navigator.share({ title: SHARE_TITLE, text: SHARE_TEXT, url }); } catch {}
     return;
@@ -1576,62 +1562,6 @@ async function shareLink() {
   }
 }
 
-async function shareFile() {
-  const btn = $('#shareFileBtn');
-  if (btn) btn.textContent = 'جارٍ التجهيز…';
-  let blob;
-  try { blob = await appFileBlob(); }
-  catch { if (btn) btn.textContent = 'تعذّر تجهيز الملف'; return; }
-
-  const file = new File([blob], 'القرآن-والأذكار.html', { type: 'text/html' });
-  if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-    try { await navigator.share({ files: [file], title: SHARE_TITLE, text: SHARE_TEXT }); } catch {}
-    if (btn) btn.textContent = 'مشاركة ملف التطبيق';
-    return;
-  }
-  const u = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = u; a.download = 'القرآن-والأذكار.html';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(u), 4000);
-  if (btn) btn.textContent = 'مشاركة ملف التطبيق';
-  banner('نُزّل الملف', 'أرسله الآن من تطبيق المراسلة كأي مستند');
-}
-
-function openShare() {
-  if (NATIVE) {
-    openSheet(`
-      <h3>مشاركة التطبيق</h3>
-      <p class="hint" style="margin:0 0 12px">أرسل رابط التطبيق لمن تحب، فيفتحه ويستعمله
-        أو يثبّته على جهازه.</p>
-      <div class="sheet-actions">
-        <button id="shareAppLink"><b>مشاركة رابط التطبيق</b></button>
-        <button data-close>إغلاق</button>
-      </div>`);
-    const b = $('#shareAppLink');
-    if (b) b.onclick = async () => {
-      const url = 'https://sahar627.github.io/tarek-ali/';
-      const data = { title: SHARE_TITLE, text: SHARE_TEXT, url };
-      if (navigator.share) { try { await navigator.share(data); } catch {} closeSheet(); return; }
-      try { await navigator.clipboard.writeText(SHARE_TITLE + '\n' + SHARE_TEXT + '\n' + url);
-            closeSheet(); banner('تم النسخ', 'نُسخ الرابط — الصقه في أي محادثة'); }
-      catch { b.textContent = url; }
-    };
-    return;
-  }
-  const online = location.protocol.startsWith('http');
-  openSheet(`
-    <h3>مشاركة التطبيق</h3>
-    <div class="sheet-actions">
-      ${online ? `<button id="shareLinkBtn"><b>مشاركة رابط التطبيق</b>
-        <span class="hint" style="display:block">يفتح فوراً، ويُثبَّت على الشاشة الرئيسية، ويصله كل تحديث</span></button>` : ''}
-      <button id="shareFileBtn"><b>مشاركة ملف التطبيق</b>
-        <span class="hint" style="display:block">ملف واحد يعمل بلا إنترنت، يبقى معه ما بقي</span></button>
-      <button data-close>إغلاق</button>
-    </div>`);
-  const l = $('#shareLinkBtn'); if (l) l.onclick = () => { closeSheet(); shareLink(); };
-  const f = $('#shareFileBtn'); if (f) f.onclick = shareFile;
-}
 
 
 /* لوحة تشرح نسخة أندرويد قبل أي تنزيل — بلا مفاجأة ولا لبس */
