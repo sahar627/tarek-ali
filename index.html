@@ -1295,7 +1295,7 @@ function isStandalone() {
   return mq('(display-mode: standalone)').matches || navigator.standalone;
 }
 function installCard() {
-  if (isStandalone()) return '';
+  if (NATIVE || isStandalone()) return '';      /* داخل التطبيق لا معنى للتثبيت */
   if (location.protocol === 'file:') return `
     <section class="install">
       <div class="ih"><span class="ico g">${svg('pin')}</span>
@@ -1577,6 +1577,26 @@ async function shareFile() {
 }
 
 function openShare() {
+  if (NATIVE) {
+    openSheet(`
+      <h3>مشاركة التطبيق</h3>
+      <p class="hint" style="margin:0 0 12px">أرسل رابط التطبيق لمن تحب، فيفتحه ويستعمله
+        أو يثبّته على جهازه.</p>
+      <div class="sheet-actions">
+        <button id="shareAppLink"><b>مشاركة رابط التطبيق</b></button>
+        <button data-close>إغلاق</button>
+      </div>`);
+    const b = $('#shareAppLink');
+    if (b) b.onclick = async () => {
+      const url = 'https://sahar627.github.io/tarek-ali/';
+      const data = { title: SHARE_TITLE, text: SHARE_TEXT, url };
+      if (navigator.share) { try { await navigator.share(data); } catch {} closeSheet(); return; }
+      try { await navigator.clipboard.writeText(SHARE_TITLE + '\n' + SHARE_TEXT + '\n' + url);
+            closeSheet(); banner('تم النسخ', 'نُسخ الرابط — الصقه في أي محادثة'); }
+      catch { b.textContent = url; }
+    };
+    return;
+  }
   const online = location.protocol.startsWith('http');
   openSheet(`
     <h3>مشاركة التطبيق</h3>
@@ -2580,7 +2600,7 @@ function viewSettings() {
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const standalone = mq('(display-mode: standalone)').matches || navigator.standalone;
-  const fileMode = location.protocol === 'file:';
+  const fileMode = !NATIVE && location.protocol === 'file:';
 
   view.innerHTML = `
     <div class="card">
