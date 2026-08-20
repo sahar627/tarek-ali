@@ -997,7 +997,20 @@ const index = q => INDEX || (INDEX = q.text.map(s => s.map(strip)));
      "by":"المصدر: … — الرخصة: …" } ] }
    {s3} و{a3} = رقم السورة والآية بثلاث خانات. يقبل مساراً محلياً أو رابطاً. */
 let RECITE = [];
-if (window.fetch && location.protocol.startsWith('http')) {
+/* داخل التطبيق لا يمكن جلب ملف من القرص، فالقائمة مضمّنة */
+const RECITE_BUILTIN = [
+  { id: 'minshawi',    name: 'المنشاوي — مرتّل',   url: 'https://everyayah.com/data/Minshawy_Murattal_128kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' },
+  { id: 'minshawi_mj', name: 'المنشاوي — مجوّد',   url: 'https://everyayah.com/data/Minshawy_Mujawwad_64kbps/{s3}{a3}.mp3',  by: 'المصدر: everyayah.com' },
+  { id: 'husary',      name: 'الحصري — مرتّل',     url: 'https://everyayah.com/data/Husary_128kbps/{s3}{a3}.mp3',            by: 'المصدر: everyayah.com' },
+  { id: 'basit',       name: 'عبد الباسط — مرتّل', url: 'https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' },
+  { id: 'afasy',       name: 'مشاري العفاسي',      url: 'https://everyayah.com/data/Alafasy_128kbps/{s3}{a3}.mp3',           by: 'المصدر: everyayah.com' },
+  { id: 'sudais',      name: 'عبد الرحمن السديس',  url: 'https://everyayah.com/data/Abdurrahmaan_As-Sudais_192kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' }
+];
+if (NATIVE) {
+  RECITE = RECITE_BUILTIN;
+  if (!prefs.reciter) { prefs.reciter = 'minshawi'; store.set('prefs', prefs); }
+}
+if (!NATIVE && window.fetch && location.protocol.startsWith('http')) {
   try {
     fetch('recite.json')
       .then(r => r.ok ? r.json() : null)
@@ -1613,7 +1626,7 @@ function openShare() {
 
 
 /* لوحة تشرح نسخة أندرويد قبل أي تنزيل — بلا مفاجأة ولا لبس */
-const APP_VER = '2.2';
+const APP_VER = '2.3';
 const APP_HOME = 'https://sahar627.github.io/tarek-ali/update.html';
 const APK_URL = 'quran-adhkar.apk';        /* من نفس نطاق الموقع — أسرع */
 const APK_FALLBACK = 'https://github.com/sahar627/tarek-ali/releases/latest/download/quran-adhkar.apk';
@@ -1624,8 +1637,8 @@ function openAthanInfo() {
       ما تستعمله الآن يعمل داخل المتصفح، والمتصفح لا يستطيع تنبيهك وهو مغلق.
       لذلك أعددنا نسخة أندرويد مستقلة تفعل ذلك.</p>
     <div class="card" style="padding:4px 12px">
-      <div class="chk ok"><span>✓</span><b>لا تطلب صلاحية إنترنت — لا يمكنها الاتصال بأي جهة</b></div>
-      <div class="chk ok"><span>✓</span><b>بلا إعلانات، ولا تجمع أي بيانات</b></div>
+      <div class="chk ok"><span>✓</span><b>بلا إعلانات، ولا تتبّع، ولا تجمع أي بيانات</b></div>
+      <div class="chk ok"><span>✓</span><b>كل المحتوى يعمل بلا إنترنت — عدا التلاوة الصوتية</b></div>
       <div class="chk ok"><span>✓</span><b>تؤذّن في وقتها ولو كانت الشاشة مقفلة</b></div>
     </div>
     <p class="hint" style="margin:12px 0 0">
@@ -2644,8 +2657,9 @@ function viewSettings() {
 
     <div class="section-title">عن التطبيق</div>
     <div class="card" style="padding:15px">
-      <p class="about" style="margin:0 0 10px"><b>سَحَر</b> يعمل بالكامل داخل جهازك:
-        لا إعلانات، ولا حسابات، ولا تتبّع، ولا يُرسل أي بيانات إلى أي جهة.</p>
+      <p class="about" style="margin:0 0 10px"><b>سَحَر</b> يعمل داخل جهازك:
+        لا إعلانات، ولا حسابات، ولا تتبّع، ولا يُرسل أي بيانات إلى أي جهة.
+        والاتصال لا يُستعمل إلا لجلب التلاوة الصوتية عند طلبها.</p>
       <p class="about" style="margin:0 0 10px"><b>نص المصحف:</b> رواية حفص بالرسم العثماني،
         من نسخة رقمية موثّقة، مقارَنة آيةً آيةً مع مصدر رقمي مستقل ثانٍ
         (١١٤ سورة و٦٢٣٦ آية، تطابق تام).</p>

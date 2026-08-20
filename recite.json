@@ -1,14 +1,41 @@
 {
   "default": "minshawi",
   "items": [
-    { "id": "minshawi", "name": "المنشاوي — مرتّل",
+    {
+      "id": "minshawi",
+      "name": "المنشاوي — مرتّل",
       "url": "https://everyayah.com/data/Minshawy_Murattal_128kbps/{s3}{a3}.mp3",
-      "by": "المصدر: everyayah.com" },
-    { "id": "minshawi_mj", "name": "المنشاوي — مجوّد",
+      "by": "المصدر: everyayah.com"
+    },
+    {
+      "id": "minshawi_mj",
+      "name": "المنشاوي — مجوّد",
       "url": "https://everyayah.com/data/Minshawy_Mujawwad_64kbps/{s3}{a3}.mp3",
-      "by": "المصدر: everyayah.com" },
-    { "id": "husary", "name": "الحصري — مرتّل",
+      "by": "المصدر: everyayah.com"
+    },
+    {
+      "id": "husary",
+      "name": "الحصري — مرتّل",
       "url": "https://everyayah.com/data/Husary_128kbps/{s3}{a3}.mp3",
-      "by": "المصدر: everyayah.com" }
+      "by": "المصدر: everyayah.com"
+    },
+    {
+      "id": "basit",
+      "name": "عبد الباسط — مرتّل",
+      "url": "https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/{s3}{a3}.mp3",
+      "by": "المصدر: everyayah.com"
+    },
+    {
+      "id": "afasy",
+      "name": "مشاري العفاسي",
+      "url": "https://everyayah.com/data/Alafasy_128kbps/{s3}{a3}.mp3",
+      "by": "المصدر: everyayah.com"
+    },
+    {
+      "id": "sudais",
+      "name": "عبد الرحمن السديس",
+      "url": "https://everyayah.com/data/Abdurrahmaan_As-Sudais_192kbps/{s3}{a3}.mp3",
+      "by": "المصدر: everyayah.com"
+    }
   ]
 }
