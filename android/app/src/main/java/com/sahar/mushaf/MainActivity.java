@@ -14,7 +14,15 @@ import org.json.JSONObject;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.ViewGroup;
@@ -113,7 +121,9 @@ public class MainActivity extends Activity {
         setContentView(web);
 
         if (saved != null) web.restoreState(saved);
-        else web.loadUrl("file:///android_asset/index.html");
+        else web.loadUrl(currentAppUrl());
+
+        checkContentUpdate();
 
         if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -125,6 +135,57 @@ public class MainActivity extends Activity {
     }
 
     /** يطلب استثناء البطارية مرة واحدة فقط، بنافذة «سماح / رفض» مباشرة */
+    /* ملف الواجهة المحدَّث يُحفظ داخل التطبيق؛ فإن غاب استعملنا المحزوم */
+    private static final String LIVE = "app-latest.html";
+    private static final String SRC_URL = "https://sahar627.github.io/tarek-ali/index.html";
+
+    private File liveFile() { return new File(getFilesDir(), LIVE); }
+
+    private String currentAppUrl() {
+        File f = liveFile();
+        return (f.exists() && f.length() > 500000)
+                ? "file://" + f.getAbsolutePath()
+                : "file:///android_asset/index.html";
+    }
+
+    /* يفحص وجود نسخة أحدث ويحفظها بهدوء؛ تظهر عند الفتحة التالية.
+       يفشل بصمت إن لم يكن هناك اتصال، فلا يزعج المستخدم. */
+    private void checkContentUpdate() {
+        new Thread(() -> {
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL(SRC_URL).openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(20000);
+                c.setRequestProperty("Accept-Encoding", "identity");
+                if (c.getResponseCode() != 200) return;
+
+                File tmp = new File(getFilesDir(), LIVE + ".part");
+                InputStream in = c.getInputStream();
+                FileOutputStream out = new FileOutputStream(tmp);
+                byte[] buf = new byte[16384];
+                int r; long total = 0;
+                while ((r = in.read(buf)) != -1) { out.write(buf, 0, r); total += r; }
+                out.close(); in.close();
+
+                /* لا نستبدل إلا بملف سليم الحجم ومختلف عن الحالي */
+                File cur = liveFile();
+                if (total < 500000 || (cur.exists() && cur.length() == total)) { tmp.delete(); return; }
+
+                File dst = liveFile();
+                if (dst.exists() && !dst.delete()) { tmp.delete(); return; }
+                if (!tmp.renameTo(dst)) { tmp.delete(); return; }
+
+                new Handler(Looper.getMainLooper()).post(() ->
+                        Scheduler.prefs(MainActivity.this).edit()
+                                 .putBoolean("contentUpdated", true).apply());
+            } catch (Exception ignored) {
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }).start();
+    }
+
     private void askBatteryOnce() {
         if (Build.VERSION.SDK_INT < 23) return;
         if (Scheduler.prefs(this).getBoolean("battAsked", false)) return;
@@ -229,6 +290,19 @@ public class MainActivity extends Activity {
         public void openBatterySettings() { requestBattery(); }
 
         /** يفتح صفحة إعدادات التطبيق لتفعيل الإشعارات يدوياً */
+        /* هل نزلت نسخة أحدث وتنتظر إعادة الفتح؟ */
+        @JavascriptInterface
+        public boolean updateReady() {
+            return Scheduler.prefs(MainActivity.this).getBoolean("contentUpdated", false);
+        }
+
+        /* يطبّق التحديث فوراً */
+        @JavascriptInterface
+        public void applyUpdate() {
+            Scheduler.prefs(MainActivity.this).edit().putBoolean("contentUpdated", false).apply();
+            runOnUiThread(() -> { if (web != null) web.loadUrl(currentAppUrl()); });
+        }
+
         @JavascriptInterface
         public void openAppSettings() {
             try {
