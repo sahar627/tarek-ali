@@ -823,13 +823,22 @@ function nearestCity(lat, lng) {
 }
 const cityIsGuessed = () => !prefs.city;
 const cityIsGps = () => !!(prefs.city && prefs.city.gps);
+function guessIndex() {
+  try { return TZ_GUESS[Intl.DateTimeFormat().resolvedOptions().timeZone] ?? 0; } catch { return 0; }
+}
 function currentCity() {
   if (prefs.city) return prefs.city;
-  let i = 0;
-  try { i = TZ_GUESS[Intl.DateTimeFormat().resolvedOptions().timeZone] ?? 0; } catch {}
-  const c = CITIES[i];
+  const c = CITIES[guessIndex()];
   return { n: c[0], lat: c[1], lng: c[2] };
 }
+/* عند أول تشغيل: طريقة الحساب تتبع بلد المدينة المخمَّنة، لا أم القرى دائماً */
+function ensureMethod() {
+  if (prefs.methodSet || prefs.city) return;
+  const m = CITIES[guessIndex()][3];
+  if (m && m !== prefs.method) { prefs.method = m; store.set('prefs', prefs); }
+  prefs.methodSet = 1; store.set('prefs', prefs);
+}
+ensureMethod();
 function todayTimes(date = new Date()) {
   const c = currentCity();
   const tz = -date.getTimezoneOffset() / 60;
@@ -1383,6 +1392,10 @@ function kaabaDistance(lat, lng) {
 }
 /* الحالة الفعلية لإذن الإشعارات، تُقرأ في كل مرة لا تُخزَّن */
 function notifState() {
+  if (NATIVE) {
+    try { return JSON.parse(Sahar.status()).notif ? 'granted' : 'denied'; }
+    catch { return 'granted'; }
+  }
   try {
     if (!window.Notification) return 'none';
     return Notification.permission;          /* granted | denied | default */
@@ -1595,6 +1608,10 @@ function openAthanInfo() {
       حجم التطبيق ٣ ميجابايت. سيفتح المتصفح ويبدأ التنزيل، فانظر شريط الإشعارات.
       وسيسألك جوالك عن السماح بالتثبيت من هذا المصدر — سؤال معتاد لكل تطبيق
       خارج المتجر، اضغط «سماح» ثم «تثبيت».</p>
+    <div class="notice"><b>ستظهر أيقونة ثانية بعد التثبيت.</b><br>
+      هذه أيقونة التطبيق الجديد، والقديمة اختصار لنسخة المتصفح.
+      بعد أن تتأكد أن الجديد يعمل، <b>احذف الأيقونة القديمة</b> — الجديد يحوي كل شيء
+      وزيادة الأذان. وانتبه أن علاماتك وعدّاداتك تبدأ من جديد في التطبيق الجديد.</div>
     <div class="sheet-actions">
       <a class="installbtn" id="apkGo" href="${APK_URL}" target="_blank" rel="noopener"
         style="text-decoration:none;margin-top:4px"><span>متابعة — ٣ ميجابايت</span></a>
@@ -1966,9 +1983,12 @@ function viewTimes() {
         const row = ns === 'granted'
           ? `<div class="chk ok"><span>✓</span><b>الإشعارات مفعّلة</b></div>`
           : ns === 'denied'
-          ? `<div class="chk no"><span>✕</span><b>الإشعارات ممنوعة — فعّلها من إعدادات المتصفح لهذا الموقع</b></div>`
+          ? `<div class="chk no"><span>✕</span><b>${NATIVE
+              ? 'الإشعارات ممنوعة — فعّلها من إعدادات التطبيق'
+              : 'الإشعارات ممنوعة — فعّلها من إعدادات المتصفح لهذا الموقع'}</b></div>
+             ${NATIVE ? `<button class="row" id="permNotif" style="justify-content:center;margin:8px 0 2px;font-family:system-ui;font-size:.86rem">فتح إعدادات الإشعارات</button>` : ''}`
           : ns === 'none'
-          ? `<div class="chk no"><span>✕</span><b>متصفحك لا يدعم الإشعارات</b></div>`
+          ? `<div class="chk no"><span>✕</span><b>الإشعارات غير متاحة في هذا المتصفح</b></div>`
           : `<div class="chk no"><span>✕</span><b>الإشعارات غير مفعّلة</b></div>`;
         return `<div class="card" style="padding:10px 12px;margin-top:9px">${row}</div>
           ${ns === 'default' ? `<button class="row" id="perm"
@@ -2028,7 +2048,10 @@ function viewTimes() {
       prefs.method = x[3];
       store.set('prefs', prefs); syncNative(); snd.open(); render();
     };
-    $('#meth').onchange = e => { prefs.method = e.target.value; store.set('prefs', prefs); syncNative(); render(); };
+    $('#meth').onchange = e => {
+      prefs.method = e.target.value; prefs.methodSet = 1;
+      store.set('prefs', prefs); syncNative(); render();
+    };
     $('#asr').onclick = e => {
       const b = e.target.closest('.chip'); if (!b) return;
       prefs.asr = +b.dataset.a; store.set('prefs', prefs); snd.tick(); render();
@@ -2063,6 +2086,9 @@ function viewTimes() {
       if (prefs.vib && navigator.vibrate) navigator.vibrate(VIB.maghrib);
       banner('تجربة', 'هكذا سيصلك التنبيه عند دخول وقت الصلاة');
     };
+    const pn = $('#permNotif');
+    if (pn) pn.onclick = () => { try { Sahar.openAppSettings(); } catch {} };
+
     const pm = $('#perm');
     if (pm) pm.onclick = async () => {
       try { await Notification.requestPermission(); } catch {}
