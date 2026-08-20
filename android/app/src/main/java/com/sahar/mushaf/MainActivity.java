@@ -18,6 +18,8 @@ import android.os.PowerManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.ViewGroup;
+import android.webkit.GeolocationPermissions;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -33,6 +35,8 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
 
     private WebView web;
+    private GeolocationPermissions.Callback pendingGeo;
+    private String pendingOrigin;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -59,12 +63,39 @@ public class MainActivity extends Activity {
         s.setBuiltInZoomControls(false);
         s.setTextZoom(100);                /* لا يتأثر بحجم خط النظام حفاظاً على تنسيق المصحف */
         s.setMediaPlaybackRequiresUserGesture(false);
+        s.setGeolocationEnabled(true);
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
 
         /* كل التنقّل داخلي (روابط #). لا شيء يخرج من التطبيق. */
+        /* يمنح واجهةَ الويب إذنَ الموقع بعد أن يأذن المستخدم للتطبيق */
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin,
+                    GeolocationPermissions.Callback cb) {
+                boolean granted = Build.VERSION.SDK_INT < 23 ||
+                        checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                                == PackageManager.PERMISSION_GRANTED ||
+                        checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                                == PackageManager.PERMISSION_GRANTED;
+                if (granted) {
+                    cb.invoke(origin, true, false);
+                } else {
+                    pendingGeo = cb;
+                    pendingOrigin = origin;
+                    if (Build.VERSION.SDK_INT >= 23) {
+                        requestPermissions(new String[] {
+                                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                android.Manifest.permission.ACCESS_COARSE_LOCATION }, 88);
+                    } else {
+                        cb.invoke(origin, false, false);
+                    }
+                }
+            }
+        });
+
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
@@ -197,6 +228,23 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void openBatterySettings() { requestBattery(); }
 
+        /** يفتح صفحة إعدادات التطبيق لتفعيل الإشعارات يدوياً */
+        @JavascriptInterface
+        public void openAppSettings() {
+            try {
+                if (Build.VERSION.SDK_INT >= 26) {
+                    Intent i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                    i.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                    startActivity(i);
+                    return;
+                }
+            } catch (Exception ignored) { }
+            try {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+        }
+
         /** هل التطبيق مستثنى من تقييد البطارية؟ */
         @JavascriptInterface
         public boolean batteryFree() { return isBatteryFree(); }
@@ -248,6 +296,17 @@ public class MainActivity extends Activity {
     }
 
     /* زر الرجوع يتنقّل داخل التطبيق قبل أن يخرج منه */
+    /* نتيجة طلب إذن الموقع: نبلّغ واجهة الويب بها */
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] res) {
+        super.onRequestPermissionsResult(req, perms, res);
+        if (req != 88 || pendingGeo == null) return;
+        boolean ok = false;
+        for (int r : res) if (r == PackageManager.PERMISSION_GRANTED) ok = true;
+        pendingGeo.invoke(pendingOrigin, ok, false);
+        pendingGeo = null; pendingOrigin = null;
+    }
+
     @Override
     public boolean onKeyDown(int code, KeyEvent e) {
         if (code == KeyEvent.KEYCODE_BACK && web != null && web.canGoBack()) {
