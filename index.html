@@ -437,6 +437,17 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .pflash span{display:block;text-align:center;font-family:system-ui,sans-serif;
   font-size:1rem;color:var(--gold);opacity:.85;margin-top:6px}
 
+/* ===== شريط التحديث ===== */
+.updbar{position:fixed;inset-inline:12px;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 10px);
+  z-index:36;display:flex;align-items:center;gap:10px;padding:11px 14px;
+  background:var(--surface);border:2px solid var(--accent);border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:740px;margin-inline:auto;
+  transform:translateY(140%);transition:transform .35s ease}
+.updbar.go{transform:translateY(0)}
+.updbar span{flex:1;font-family:system-ui,sans-serif;font-size:.92rem;font-weight:600}
+.updbar button{padding:9px 16px;border-radius:9px;background:var(--accent);color:var(--bg);
+  border:0;font-family:system-ui,sans-serif;font-size:.88rem;font-weight:700}
+
 </style>
 </head>
 <body>
@@ -1626,7 +1637,7 @@ function openShare() {
 
 
 /* لوحة تشرح نسخة أندرويد قبل أي تنزيل — بلا مفاجأة ولا لبس */
-const APP_VER = '2.3';
+const APP_VER = '2.4';
 const APP_HOME = 'https://sahar627.github.io/tarek-ali/update.html';
 const APK_URL = 'quran-adhkar.apk';        /* من نفس نطاق الموقع — أسرع */
 const APK_FALLBACK = 'https://github.com/sahar627/tarek-ali/releases/latest/download/quran-adhkar.apk';
@@ -2675,6 +2686,7 @@ function viewSettings() {
     ${NATIVE ? `<div class="section-title">تحديث التطبيق</div>
       <div class="card" style="padding:12px 13px">
         <div class="chk ok"><span>${AR(APP_VER)}</span><b>الإصدار المثبّت عندك</b></div>
+        <div class="chk ok"><span>✓</span><b>المصحف والأذكار والتفسير تتحدّث تلقائياً</b></div>
         <a class="apkbtn" href="${APP_HOME}" target="_blank" rel="noopener"
           style="margin-top:10px;text-decoration:none">${svg('down')}<span>ابحث عن تحديث</span></a>
       </div>` : ''}
@@ -2712,6 +2724,24 @@ addEventListener('appinstalled', () => {
 });
 
 $('#settingsBtn').onclick = () => { location.hash = '#/settings'; };
+
+/* داخل التطبيق: إن كانت نسخة أحدث جاهزة، نعرضها بضغطة بلا مقاطعة */
+if (NATIVE) {
+  const askUpdate = () => {
+    try {
+      if (!Sahar.updateReady || !Sahar.updateReady()) return;
+      if ($('#updBar')) return;
+      const el = document.createElement('div');
+      el.id = 'updBar'; el.className = 'updbar';
+      el.innerHTML = '<span>وصل تحديث جديد</span><button id="updGo">تطبيقه الآن</button>';
+      document.body.appendChild(el);
+      setTimeout(() => el.classList.add('go'), 30);
+      $('#updGo').onclick = () => { try { Sahar.applyUpdate(); } catch {} };
+    } catch {}
+  };
+  setTimeout(askUpdate, 4000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) askUpdate(); });
+}
 
 /* زر المظهر في الشريط العلوي — تبديل فوري بضغطة */
 function paintThemeBtn() {
