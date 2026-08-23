@@ -514,6 +514,7 @@ const store = {
 const prefs = Object.assign(
   { theme: 'night', q: 1.45, lh: 2.35, snd: true, city: null, method: 'makkah', asr: 1,
     alert: true, before: 15, chime: 'takbir', chimeFajr: 'same', vol: 1, vib: true,
+    respectSilent: true,
     awake: true, khatma: null },
   store.get('prefs', {}));
 let marks = store.get('marks', []);
@@ -647,7 +648,8 @@ function syncNative() {
       lat: c.lat, lng: c.lng, method: prefs.method, asr: prefs.asr,
       alert: prefs.alert !== false, before: +prefs.before || 0,
       chime: prefs.chime || '', chimeFajr: prefs.chimeFajr || 'same',
-      vib: prefs.vib !== false, vol: prefs.vol ?? 1
+      vib: prefs.vib !== false, vol: prefs.vol ?? 1,
+      respectSilent: prefs.respectSilent !== false
     }));
   } catch {}
 }
@@ -1565,7 +1567,7 @@ async function openShare() {
 
 
 /* لوحة تشرح نسخة أندرويد قبل أي تنزيل — بلا مفاجأة ولا لبس */
-const APP_VER = '2.4';
+const APP_VER = '2.5';
 const APP_HOME = 'https://sahar627.github.io/tarek-ali/update.html';
 const APK_URL = 'quran-adhkar.apk';        /* من نفس نطاق الموقع — أسرع */
 const APK_FALLBACK = 'https://github.com/sahar627/tarek-ali/releases/latest/download/quran-adhkar.apk';
@@ -1948,6 +1950,11 @@ function viewTimes() {
           </div></div>
         <div class="set-row"><label for="vol">مستوى الصوت</label>
           <input id="vol" type="range" min="0.2" max="1" step="0.05" value="${prefs.vol ?? 1}"></div>` : ''}
+        ${NATIVE ? `<div class="set-row"><label>عند الوضع الصامت</label>
+          <div class="chips" id="rs">
+            <button class="chip" data-v="1" aria-pressed="${prefs.respectSilent !== false}">لا يؤذّن</button>
+            <button class="chip" data-v="0" aria-pressed="${prefs.respectSilent === false}">يؤذّن</button>
+          </div></div>` : ''}
         <div class="set-row"><label>الاهتزاز</label>
           <div class="chips" id="vb">
             <button class="chip" data-v="1" aria-pressed="${prefs.vib !== false}">تشغيل</button>
@@ -2055,6 +2062,7 @@ function viewTimes() {
       if (curAudio && !curAudio.native) curAudio.volume = prefs.vol;
     };
     pick('vb', 'vib', v => v === '1');
+    pick('rs', 'respectSilent', v => v === '1');
 
     $('#try').onclick = () => {
       if (prefs.chime === 'soft') snd.alert(true);
