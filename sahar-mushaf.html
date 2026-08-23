@@ -446,6 +446,14 @@ input[type=range]{width:145px;accent-color:var(--accent)}
 .updbar button{padding:9px 16px;border-radius:9px;background:var(--accent);color:var(--bg);
   border:0;font-family:system-ui,sans-serif;font-size:.88rem;font-weight:700}
 
+/* ===== زر الاستماع للسورة ===== */
+.sbtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin-top:9px;
+  padding:9px 16px;border-radius:9px;background:var(--accent-dim);
+  border:1px solid var(--accent-line);color:var(--accent);
+  font-family:system-ui,sans-serif;font-size:.86rem;font-weight:700}
+.sbtn svg{width:17px;height:17px}
+.sbtn:active{background:var(--accent);color:var(--bg)}
+
 </style>
 </head>
 <body>
@@ -696,6 +704,7 @@ const I = {
   bed: '<path d="M4 18v-9m0 5h16v4m0-4a3 3 0 00-3-3h-6v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.7"/>',
   share: '<path d="M12 3.5v11m0-11L8.4 7.1M12 3.5l3.6 3.6M5.5 13v5.5a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   compass: '<circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15.2 8.8l-1.7 4.7-4.7 1.7 1.7-4.7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  play: '<path d="M8 5.5l10 6.5-10 6.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
   bell: '<path d="M12 4.2a5.4 5.4 0 015.4 5.4c0 4 1.4 5.4 1.4 5.4H5.2s1.4-1.4 1.4-5.4A5.4 5.4 0 0112 4.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10.2 18a1.9 1.9 0 003.6 0M12 2.6v1.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   down: '<path d="M12 3.5v11m0 0l-3.6-3.6M12 14.5l3.6-3.6M5.5 17v1.5a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   pin: '<path d="M12 21s6-5.6 6-10a6 6 0 10-12 0c0 4.4 6 10 6 10z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/>'
@@ -1169,6 +1178,57 @@ function khatmaState(q) {
   };
 }
 
+
+
+/* ================= الاستماع للسورة كاملة =================
+   مصدر يرفع كل سورة في ملف واحد. القاعدة: المعرّف = الأساس + رقم السورة. */
+const SURAH_AUDIO = [
+  { id: 'tablawy_mj_s', name: 'الطبلاوي — مجوّد', base: 86562 }
+];
+const surahUrl = (item, si) =>
+  'https://audio.islamweb.net/audio/downloadmp3.php?audioid=' + (item.base + si);
+
+/* مشغّل السورة الكاملة */
+const surahPlayer = {
+  audio: null, si: 0,
+  start(si, name) {
+    this.stop();
+    const item = SURAH_AUDIO.find(x => x.id === (prefs.surahReciter || SURAH_AUDIO[0].id))
+              || SURAH_AUDIO[0];
+    this.si = si;
+    try {
+      this.audio = new Audio(surahUrl(item, si));
+      this.audio.onerror = () => {
+        this.stop();
+        banner('تعذّر تشغيل السورة', navigator.onLine === false
+          ? 'يحتاج اتصالاً بالإنترنت' : 'لم يصل الملف الصوتي');
+      };
+      this.audio.onended = () => this.stop();
+      this.audio.play().catch(() => this.audio.onerror());
+      this.bar(name, item.name);
+    } catch { this.stop(); }
+  },
+  toggle() {
+    if (!this.audio) return;
+    if (this.audio.paused) { this.audio.play().catch(() => {}); $('#sbTog').textContent = '❚❚'; }
+    else { this.audio.pause(); $('#sbTog').textContent = '▶'; }
+  },
+  stop() {
+    if (this.audio) { try { this.audio.pause(); } catch {} this.audio = null; }
+    const b = $('#surahbar'); if (b) b.remove();
+  },
+  bar(name, who) {
+    if ($('#surahbar')) return;
+    const el = document.createElement('div');
+    el.id = 'surahbar'; el.className = 'playbar';
+    el.innerHTML = `<button id="sbTog" aria-label="إيقاف مؤقت">❚❚</button>
+      <span>سورة ${esc(name)}<small style="display:block;font-size:.72rem;opacity:.75">${esc(who)}</small></span>
+      <button id="sbStop" aria-label="إنهاء">✕</button>`;
+    document.body.appendChild(el);
+    $('#sbTog').onclick = () => this.toggle();
+    $('#sbStop').onclick = () => this.stop();
+  }
+};
 
 /* ================= الصفحات والأجزاء ================= */
 const pageCount = q => (q.pageStart ? q.pageStart.length : 0);
@@ -2366,7 +2426,9 @@ function renderPage(q, p, focusIdx) {
       names.push(su.n);
       if (ai === 1) {
         body += `<div class="surah-head"><b>سورة ${esc(su.n)}</b>
-          <small>${su.t} · ${AR(su.c)} آية · الصفحات ${AR(q.surahPages[si - 1][0])}–${AR(q.surahPages[si - 1][1])}</small></div>`;
+          <small>${su.t} · ${AR(su.c)} آية · الصفحات ${AR(q.surahPages[si - 1][0])}–${AR(q.surahPages[si - 1][1])}</small>
+          ${SURAH_AUDIO.length ? `<button class="sbtn" data-sura="${si}" data-name="${esc(su.n)}">
+            ${svg('play')}<span>استمع للسورة كاملة</span></button>` : ''}</div>`;
         if (si !== 1 && si !== 9)
           body += '<div class="basmala">بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ</div>';
       }
@@ -2420,6 +2482,13 @@ function renderPage(q, p, focusIdx) {
   bindSwipe(sheetEl,
     () => { if (p < pageCount(q)) { flipDir = 1; location.hash = '#/p/' + (p + 1); } },
     () => { if (p > 1) { flipDir = -1; location.hash = '#/p/' + (p - 1); } });
+
+  view.querySelectorAll('.sbtn').forEach(b => {
+    b.onclick = e => {
+      e.preventDefault(); e.stopPropagation();
+      surahPlayer.start(+b.dataset.sura, b.dataset.name);
+    };
+  });
 
   view.querySelectorAll('.pager a[data-dir]').forEach(a => {
     a.addEventListener('click', () => { flipDir = +a.dataset.dir; snd.page(); });
@@ -2700,7 +2769,7 @@ paintThemeBtn();
 /* ---------- التوجيه ---------- */
 let booted = false;
 function route() {
-  closeSheet(); stopTicker(); stopCompass(); player.stop();
+  closeSheet(); stopTicker(); stopCompass(); player.stop(); surahPlayer.stop();
   const p = (location.hash || '#/home').slice(2).split('/');
   if (booted) { p[0] === 's' ? snd.page() : snd.open(); }
   booted = true;
