@@ -6,6 +6,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Build;
@@ -21,6 +22,9 @@ public class AdhanService extends Service {
     public static final String ACTION_STOP = "com.sahar.mushaf.STOP_ADHAN";
     private MediaPlayer mp;
     private PowerManager.WakeLock lock;
+    private AudioManager am;
+    private Object focusReq;                       /* AudioFocusRequest على ٢٦+ */
+    private AudioManager.OnAudioFocusChangeListener focusListener;
 
     @Override public IBinder onBind(Intent i) { return null; }
 
@@ -43,6 +47,20 @@ public class AdhanService extends Service {
             }
         } catch (Exception ignored) { }
 
+        am = (AudioManager) getSystemService(AUDIO_SERVICE);
+
+        /* لا نؤذّن أثناء مكالمة جارية — الإشعار وحده يكفي */
+        if (am != null && am.getMode() != AudioManager.MODE_NORMAL) {
+            stopAll();
+            return START_NOT_STICKY;
+        }
+        /* واحترام الوضع الصامت إن اختاره المستخدم */
+        if (am != null && Scheduler.prefs(this).getBoolean("respectSilent", true)
+                && am.getRingerMode() != AudioManager.RINGER_MODE_NORMAL) {
+            stopAll();
+            return START_NOT_STICKY;
+        }
+
         try {
             AssetFileDescriptor afd = getAssets().openFd(asset);
             mp = new MediaPlayer();
@@ -57,6 +75,13 @@ public class AdhanService extends Service {
             afd.close();
             float vol = Scheduler.prefs(this).getFloat("vol", 1f);
             mp.setVolume(vol, vol);
+            /* إن ورد اتصال أو احتاج غيرُنا الصوت، نتوقف فوراً */
+            focusListener = change -> {
+                if (change == AudioManager.AUDIOFOCUS_LOSS
+                        || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) stopAll();
+            };
+            requestFocus();
+
             mp.setOnCompletionListener(m -> stopAll());
             mp.setOnErrorListener((m, w, e) -> { stopAll(); return true; });
             mp.prepare();
@@ -87,9 +112,43 @@ public class AdhanService extends Service {
         return b.build();
     }
 
+    @SuppressWarnings("deprecation")
+    private void requestFocus() {
+        if (am == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                AudioFocusRequest r = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                        .setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ALARM)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                        .setOnAudioFocusChangeListener(focusListener)
+                        .build();
+                focusReq = r;
+                am.requestAudioFocus(r);
+            } else {
+                am.requestAudioFocus(focusListener, AudioManager.STREAM_ALARM,
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+            }
+        } catch (Exception ignored) { }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void dropFocus() {
+        if (am == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= 26 && focusReq instanceof AudioFocusRequest) {
+                am.abandonAudioFocusRequest((AudioFocusRequest) focusReq);
+            } else if (focusListener != null) {
+                am.abandonAudioFocus(focusListener);
+            }
+        } catch (Exception ignored) { }
+        focusReq = null;
+    }
+
     private void stopAll() {
         try { if (mp != null) { mp.stop(); mp.release(); } } catch (Exception ignored) { }
         mp = null;
+        dropFocus();
         try { if (lock != null && lock.isHeld()) lock.release(); } catch (Exception ignored) { }
         lock = null;
         stopForeground(true);
