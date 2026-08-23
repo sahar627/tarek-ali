@@ -26,6 +26,18 @@
       "by": "المصدر: everyayah.com"
     },
     {
+      "id": "tablawy",
+      "name": "الطبلاوي — مرتّل",
+      "url": "https://everyayah.com/data/Mohammad_al_Tablaway_128kbps/{s3}{a3}.mp3",
+      "by": "المصدر: everyayah.com"
+    },
+    {
+      "id": "tablawy_mj",
+      "name": "الطبلاوي — مجوّد",
+      "url": "https://everyayah.com/data/Mohammad_al_Tablaway_64kbps/{s3}{a3}.mp3",
+      "by": "المصدر: everyayah.com"
+    },
+    {
       "id": "afasy",
       "name": "مشاري العفاسي",
       "url": "https://everyayah.com/data/Alafasy_128kbps/{s3}{a3}.mp3",
@@ -44,14 +56,8 @@
       "by": "المصدر: everyayah.com"
     },
     {
-      "id": "husary_teach2",
-      "name": "الحصري — معلّم (مع ترديد)",
-      "url": "https://everyayah.com/data/Husary_128kbps_Mujawwad/{s3}{a3}.mp3",
-      "by": "المصدر: everyayah.com"
-    },
-    {
       "id": "minshawi_teach",
-      "name": "المنشاوي — المصحف المعلّم",
+      "name": "المنشاوي — معلّم مع ترديد",
       "url": "https://everyayah.com/data/Minshawy_Teacher_128kbps/{s3}{a3}.mp3",
       "by": "المصدر: everyayah.com"
     }
