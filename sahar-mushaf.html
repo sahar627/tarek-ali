@@ -1015,7 +1015,10 @@ const RECITE_BUILTIN = [
   { id: 'husary',      name: 'الحصري — مرتّل',     url: 'https://everyayah.com/data/Husary_128kbps/{s3}{a3}.mp3',            by: 'المصدر: everyayah.com' },
   { id: 'basit',       name: 'عبد الباسط — مرتّل', url: 'https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' },
   { id: 'afasy',       name: 'مشاري العفاسي',      url: 'https://everyayah.com/data/Alafasy_128kbps/{s3}{a3}.mp3',           by: 'المصدر: everyayah.com' },
-  { id: 'sudais',      name: 'عبد الرحمن السديس',  url: 'https://everyayah.com/data/Abdurrahmaan_As-Sudais_192kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' }
+  { id: 'sudais',      name: 'عبد الرحمن السديس',  url: 'https://everyayah.com/data/Abdurrahmaan_As-Sudais_192kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' },
+  { id: 'husary_teach',   name: 'الحصري — المصحف المعلّم',    url: 'https://everyayah.com/data/Husary_Muallim_128kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' },
+  { id: 'husary_teach2',  name: 'الحصري — معلّم (مع ترديد)',  url: 'https://everyayah.com/data/Husary_128kbps_Mujawwad/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' },
+  { id: 'minshawi_teach', name: 'المنشاوي — المصحف المعلّم',  url: 'https://everyayah.com/data/Minshawy_Teacher_128kbps/{s3}{a3}.mp3', by: 'المصدر: everyayah.com' },
 ];
 if (NATIVE) {
   RECITE = RECITE_BUILTIN;
@@ -1065,10 +1068,11 @@ const player = {
     this.mark();
   },
   fail() {
+    const r = reciterById(prefs.reciter);
     this.stop();
     banner('تعذّر تشغيل التلاوة', navigator.onLine === false
       ? 'التلاوة تحتاج اتصالاً بالإنترنت'
-      : 'لم يصل الملف الصوتي لهذه الآية');
+      : 'لم يصل صوت ' + (r ? r.name : 'هذا القارئ') + ' — جرّب قارئاً آخر');
   },
   mark() {
     document.querySelectorAll('.ayah.is-playing').forEach(x => x.classList.remove('is-playing'));
