@@ -244,6 +244,7 @@ public class MainActivity extends Activity {
                 e.putString("chime", o.optString("chime", ""));
                 e.putString("chimeFajr", o.optString("chimeFajr", "same"));
                 e.putBoolean("vib", o.optBoolean("vib", true));
+                e.putBoolean("respectSilent", o.optBoolean("respectSilent", true));
                 e.putFloat("vol", (float) o.optDouble("vol", 1));
                 e.apply();
                 Scheduler.scheduleNext(MainActivity.this);
