@@ -7,6 +7,8 @@
     <!-- الموقع للقبلة ومواقيت الصلاة — يعمل بالأقمار بلا إنترنت -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- لمعرفة أن هناك مكالمة جارية فلا يؤذّن فوقها -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
