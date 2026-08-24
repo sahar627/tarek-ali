@@ -12,6 +12,7 @@ import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.telephony.TelephonyManager;
 
 /**
  * خدمة أمامية تشغّل الأذان من داخل الحزمة، ولو كان الجهاز نائماً.
@@ -50,7 +51,7 @@ public class AdhanService extends Service {
         am = (AudioManager) getSystemService(AUDIO_SERVICE);
 
         /* لا نؤذّن أثناء مكالمة جارية — الإشعار وحده يكفي */
-        if (am != null && am.getMode() != AudioManager.MODE_NORMAL) {
+        if (inCall()) {
             stopAll();
             return START_NOT_STICKY;
         }
@@ -78,9 +79,11 @@ public class AdhanService extends Service {
             /* إن ورد اتصال أو احتاج غيرُنا الصوت، نتوقف فوراً */
             focusListener = change -> {
                 if (change == AudioManager.AUDIOFOCUS_LOSS
-                        || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) stopAll();
+                        || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+                        || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) stopAll();
             };
             requestFocus();
+            watchCalls();
 
             mp.setOnCompletionListener(m -> stopAll());
             mp.setOnErrorListener((m, w, e) -> { stopAll(); return true; });
@@ -110,6 +113,36 @@ public class AdhanService extends Service {
          .setContentIntent(open)
          .addAction(0, "إيقاف", stop);
         return b.build();
+    }
+
+    /* فحص المكالمة من ثلاث جهات، فقد تُخفق إحداها على بعض الأجهزة */
+    @SuppressWarnings("deprecation")
+    private boolean inCall() {
+        try {
+            if (am != null) {
+                int m = am.getMode();
+                if (m == AudioManager.MODE_IN_CALL || m == AudioManager.MODE_IN_COMMUNICATION
+                        || m == AudioManager.MODE_RINGTONE) return true;
+                if (am.isMusicActive() && am.getMode() != AudioManager.MODE_NORMAL) return true;
+            }
+        } catch (Exception ignored) { }
+        try {
+            TelephonyManager tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+            if (tm != null && tm.getCallState() != TelephonyManager.CALL_STATE_IDLE) return true;
+        } catch (Exception ignored) { }
+        return false;
+    }
+
+    /* نراقب المكالمة أثناء التشغيل: إن بدأت مكالمة توقّف الأذان فوراً */
+    private void watchCalls() {
+        final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+        final Runnable[] tick = new Runnable[1];
+        tick[0] = () -> {
+            if (mp == null) return;
+            if (inCall()) { stopAll(); return; }
+            h.postDelayed(tick[0], 1500);
+        };
+        h.postDelayed(tick[0], 1500);
     }
 
     @SuppressWarnings("deprecation")
